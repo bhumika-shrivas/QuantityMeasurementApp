@@ -8,37 +8,67 @@ public enum TemperatureUnit implements IMeasurable {
 
     CELSIUS {
         @Override
-        public double toBase(double value) {
+        public double convertToBaseUnit(double value) {
             return value;
         }
 
         @Override
-        public double fromBase(double baseValue) {
+        public double convertFromBaseUnit(double baseValue) {
             return baseValue;
+        }
+
+        @Override
+        public double getConversionFactor() {
+            return 1.0;
+        }
+
+        @Override
+        public String getUnitName() {
+            return name();
         }
     },
 
     FAHRENHEIT {
         @Override
-        public double toBase(double value) {
-            return (value - 32) * 5 / 9;
+        public double convertToBaseUnit(double value) {
+            return (value - 32) * 5.0 / 9.0;
         }
 
         @Override
-        public double fromBase(double baseValue) {
-            return (baseValue * 9 / 5) + 32;
+        public double convertFromBaseUnit(double baseValue) {
+            return (baseValue * 9.0 / 5.0) + 32;
+        }
+
+        @Override
+        public double getConversionFactor() {
+            return 1.0;
+        }
+
+        @Override
+        public String getUnitName() {
+            return name();
         }
     },
 
     KELVIN {
         @Override
-        public double toBase(double value) {
+        public double convertToBaseUnit(double value) {
             return value - 273.15;
         }
 
         @Override
-        public double fromBase(double baseValue) {
+        public double convertFromBaseUnit(double baseValue) {
             return baseValue + 273.15;
+        }
+
+        @Override
+        public double getConversionFactor() {
+            return 1.0;
+        }
+
+        @Override
+        public String getUnitName() {
+            return name();
         }
     };
 }
