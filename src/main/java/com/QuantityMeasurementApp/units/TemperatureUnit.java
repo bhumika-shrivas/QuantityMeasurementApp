@@ -1,8 +1,12 @@
-package com.QuantityMeasurementApp;
+package com.QuantityMeasurementApp.units;
+
+import com.QuantityMeasurementApp.IMeasurable;
 
 /**
  * Enum representing Temperature Units.
  * Base unit: CELSIUS
+ * Temperature conversions are affine (offset + scale) rather than pure scaling,
+ * so each unit provides custom convertToBaseUnit/convertFromBaseUnit implementations.
  */
 public enum TemperatureUnit implements IMeasurable {
 
@@ -71,4 +75,20 @@ public enum TemperatureUnit implements IMeasurable {
             return name();
         }
     };
+
+    // Implement missing IMeasurable methods so the enum compiles cleanly
+    @Override
+    public String getMeasurementType() {
+        return "TEMPERATURE";
+    }
+
+    @Override
+    public IMeasurable fromUnitName(String unitName) {
+        if (unitName == null) return null;
+        try {
+            return TemperatureUnit.valueOf(unitName.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return null; // unknown temperature unit
+        }
+    }
 }

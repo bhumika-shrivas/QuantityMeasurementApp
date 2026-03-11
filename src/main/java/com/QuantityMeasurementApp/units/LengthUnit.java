@@ -1,4 +1,6 @@
-package com.QuantityMeasurementApp;
+package com.QuantityMeasurementApp.units;
+
+import com.QuantityMeasurementApp.IMeasurable;
 
 public enum LengthUnit implements IMeasurable{
 
@@ -27,5 +29,22 @@ public enum LengthUnit implements IMeasurable{
     
     public String getUnitName() {
     	return this.name();
+    }
+
+    // Implement measurement type for this enum
+    @Override
+    public String getMeasurementType() {
+        return "LENGTH";
+    }
+
+    // Resolve a unit by its name (case-insensitive). Returns null if not found.
+    @Override
+    public IMeasurable fromUnitName(String unitName) {
+        if (unitName == null) return null;
+        try {
+            return LengthUnit.valueOf(unitName.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 }
