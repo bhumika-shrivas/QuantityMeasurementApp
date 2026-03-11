@@ -1,42 +1,98 @@
 package com.QuantityMeasurementApp;
 
+import com.QuantityMeasurementApp.controller.QuantityMeasurementController;
+import com.QuantityMeasurementApp.dto.QuantityDTO;
+import com.QuantityMeasurementApp.exception.QuantityMeasurementException;
+import com.QuantityMeasurementApp.repository.IQuantityMeasurementRepository;
+import com.QuantityMeasurementApp.repository.impl.QuantityMeasurementCacheRepository;
+import com.QuantityMeasurementApp.service.IQuantityMeasurementService;
+import com.QuantityMeasurementApp.service.impl.QuantityMeasurementServiceImpl;
 import com.QuantityMeasurementApp.units.LengthUnit;
 import com.QuantityMeasurementApp.units.TemperatureUnit;
-import com.QuantityMeasurementApp.units.VolumeUnit;
 import com.QuantityMeasurementApp.units.WeightUnit;
 
 public class QuantityMeasurementApp {
 
     public static void main(String[] args) {
 
-        Quantity<LengthUnit> length1 = new Quantity<>(10.0, LengthUnit.FEET);
-        Quantity<LengthUnit> length2 = new Quantity<>(6.0, LengthUnit.INCHES);
+        // Obtain Repository (singleton)
+        IQuantityMeasurementRepository repository = QuantityMeasurementCacheRepository.getInstance();
 
-        System.out.println("Subtract Length: " + length1.subtract(length2));
+        // Create Service (uses repository internally)
+        IQuantityMeasurementService service = new QuantityMeasurementServiceImpl();
 
-        System.out.println("Subtract Explicit (Inches): " + length1.subtract(length2, LengthUnit.INCHES));
+        // Create Controller (inject service)
+        QuantityMeasurementController controller = new QuantityMeasurementController(service);
 
-        Quantity<WeightUnit> weight1 = new Quantity<>(10.0, WeightUnit.KILOGRAM);
-        Quantity<WeightUnit> weight2 = new Quantity<>(5.0, WeightUnit.KILOGRAM);
 
-        System.out.println("Division Weight: " + weight1.divide(weight2));
+        // -----------------------------------------
+        //      Length Equality Demonstration
+        // -----------------------------------------
 
-        Quantity<VolumeUnit> volume1 = new Quantity<>(5.0, VolumeUnit.LITRE);
-        Quantity<VolumeUnit> volume2 = new Quantity<>(10.0, VolumeUnit.LITRE);
+        QuantityDTO quantity1 = new QuantityDTO(
+                2,
+                LengthUnit.FEET.getUnitName(),
+                LengthUnit.FEET.getMeasurementType()
+        );
 
-        System.out.println("Division Volume: " + volume1.divide(volume2));
-        
-        Quantity<TemperatureUnit> temp1 =
-                new Quantity<>(0.0, TemperatureUnit.CELSIUS);
+        QuantityDTO quantity2 = new QuantityDTO(
+                24,
+                LengthUnit.INCHES.getUnitName(),
+                LengthUnit.INCHES.getMeasurementType()
+        );
 
-        Quantity<TemperatureUnit> temp2 =
-                new Quantity<>(32.0, TemperatureUnit.FAHRENHEIT);
+        String comparisonResult = controller.performComparison(quantity1, quantity2);
+        System.out.println("Comparison result: " + comparisonResult);
 
-        System.out.println("Temperature equality: " + temp1.equals(temp2));
 
-        Quantity<TemperatureUnit> temp3 =
-                temp1.add(new Quantity<>(10.0, TemperatureUnit.CELSIUS));
+        // -----------------------------------------
+        //         Temperature Conversion
+        // -----------------------------------------
 
-        System.out.println("Temperature addition: " + temp3.getValue());
+        QuantityDTO temp1 = new QuantityDTO(
+                0,
+                TemperatureUnit.CELSIUS.getUnitName(),
+                TemperatureUnit.CELSIUS.getMeasurementType()
+        );
+
+        QuantityDTO temp2 = new QuantityDTO(
+                32,
+                TemperatureUnit.FAHRENHEIT.getUnitName(),
+                TemperatureUnit.FAHRENHEIT.getMeasurementType()
+        );
+
+        // performConversion expects a source DTO and a target unit name string
+        String tempConversionResult = controller.performConversion(temp1, temp2.getUnit());
+        System.out.println("Temperature conversion result: " + tempConversionResult);
+
+
+        // -----------------------------------------
+        //      Temperature Addition Attempt
+        // -----------------------------------------
+
+        try {
+            String tempAddResult = controller.performAddition(temp1, temp2);
+            System.out.println("Temperature addition result: " + tempAddResult);
+        } catch (QuantityMeasurementException ex) {
+            System.out.println("Temperature addition not supported: " + ex.getMessage());
+        }
+
+
+        // -----------------------------------------
+        //       Cross Category Operation
+        // -----------------------------------------
+
+        QuantityDTO weightQuantity = new QuantityDTO(
+                10,
+                WeightUnit.KILOGRAM.getUnitName(),
+                WeightUnit.KILOGRAM.getMeasurementType()
+        );
+
+        try {
+            String crossAddResult = controller.performAddition(quantity1, weightQuantity);
+            System.out.println("Cross-category addition result: " + crossAddResult);
+        } catch (QuantityMeasurementException ex) {
+            System.out.println("Cross-category addition not supported: " + ex.getMessage());
+        }
     }
 }
