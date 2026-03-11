@@ -1,200 +1,304 @@
-# ✅ UC14: Temperature Measurement
+# ✅ UC15: N-Tier Architecture Refactoring for Quantity Measurement Application
 
 ## 📖 Description
 
-UC14 extends the Generic Quantity framework by introducing **Temperature Measurement** support.
+UC15 refactors the Quantity Measurement Application into a **clean N-Tier architecture** to improve maintainability, scalability, and separation of concerns.
 
-Unlike previous measurement categories (Length, Weight, Volume), temperature conversion is **non-linear** and involves both scaling and offset adjustments.
+Previous use cases (UC1–UC14) implemented measurement logic inside a single application layer. While functional, this structure mixed responsibilities such as input handling, business logic, and data representation.
 
-This use case demonstrates that the architecture supports not only multiplicative conversions but also **formula-based conversions**, without modifying the core `Quantity` class.
+UC15 restructures the system into layered architecture consisting of:
+
+- Controller Layer
+- Service Layer
+- Repository Layer
+- Entity / Model Layer
+- Data Transfer Objects (DTO)
+
+This refactoring introduces **professional application architecture patterns** while preserving all existing measurement functionality.
 
 ---
 
 ## 🎯 Objective
 
-- Introduce `TemperatureUnit` enum.
-- Support temperature units:
-  - Celsius
-  - Fahrenheit
-  - Kelvin
-- Enable:
-  - Equality comparison
-  - Conversion between units
-  - Addition and subtraction
-- Preserve centralized arithmetic logic from UC13.
-- Maintain cross-category safety.
-- Ensure backward compatibility (UC1–UC13 remain unchanged).
+- Refactor the application into **N-Tier architecture**
+- Introduce **DTO objects** for data transfer
+- Introduce **Service layer** for business logic
+- Introduce **Repository layer** for data storage
+- Introduce **Entity layer** for operation records
+- Improve **testability and scalability**
+- Preserve all functionality from **UC1–UC14**
+- Ensure clear separation of responsibilities
 
 ---
 
-## 🌡 Temperature Units
+## 🏗 N-Tier Architecture
 
-| Unit | Conversion to Base (Celsius) |
-|------|-------------------------------|
-| Celsius | C |
-| Fahrenheit | (F − 32) × 5/9 |
-| Kelvin | K − 273.15 |
+The application now follows the layered architecture below:
 
-Base unit: **Celsius**
 
----
+Application Layer
+↓
+Controller Layer
+↓
+Service Layer
+↓
+Repository Layer
+↓
+Entity / Model Layer
 
-## 🔄 Conversion Formulas
 
-### 🔹 Celsius ↔ Fahrenheit
-
-```
-°F = (°C × 9/5) + 32
-°C = (°F − 32) × 5/9
-```
-
-### 🔹 Celsius ↔ Kelvin
-
-```
-K = °C + 273.15
-°C = K − 273.15
-```
+Each layer performs a specific role and communicates through clearly defined interfaces.
 
 ---
 
-## 🏗 Architectural Design
+## 🔹 Controller Layer
 
-Temperature is implemented as:
 
-```
-enum TemperatureUnit implements IMeasurable
-```
+QuantityMeasurementController
 
-Each constant overrides:
 
-```
-toBase(double value)
-fromBase(double baseValue)
-```
+Responsibilities:
 
-Unlike Length/Weight/Volume, temperature does **not** rely on a simple multiplication factor.
+- Accept `QuantityDTO` input objects
+- Validate input parameters
+- Delegate operations to service layer
+- Display results or error messages
 
-No modification was required in:
+Supported operations:
 
-- `Quantity` class
-- Centralized arithmetic logic
-- Existing measurement domains
+- Comparison
+- Conversion
+- Addition
+- Subtraction
+- Division
 
-This confirms the flexibility of the generic architecture.
+The controller contains **no business logic**.
 
 ---
 
-## 🔄 Functional Behavior
+## 🔹 Service Layer
 
-### 🔹 Equality
 
-```
-0°C == 32°F
-0°C == 273.15K
-32°F == 273.15K
-```
+IQuantityMeasurementService
+QuantityMeasurementServiceImpl
 
-All comparisons normalize to Celsius before evaluation.
 
----
+Responsibilities:
 
-### 🔹 Conversion
+- Perform all measurement operations
+- Convert DTO objects to internal models
+- Validate category compatibility
+- Execute arithmetic operations
+- Handle exceptions
+- Create entity records for repository
 
-```
-new Quantity<>(0, CELSIUS).convertTo(FAHRENHEIT)
-→ 32°F
-```
-
-```
-new Quantity<>(273.15, KELVIN).convertTo(CELSIUS)
-→ 0°C
-```
+The service layer represents the **core business logic** of the application.
 
 ---
 
-### 🔹 Addition & Subtraction
+## 🔹 Repository Layer
 
-Arithmetic works through centralized logic.
 
-Example:
+IQuantityMeasurementRepository
+QuantityMeasurementCacheRepository
 
-```
-10°C + 5°C → 15°C
-```
 
-```
-10°C − 5°C → 5°C
-```
+Responsibilities:
 
-⚠ Note: Although mathematically valid in this framework, temperature arithmetic may not always represent physical temperature behavior in real-world thermodynamics.
+- Store operation records
+- Maintain in-memory cache
+- Persist history using serialization
+
+Design Pattern used:
+
+
+Singleton Pattern
+
+
+Only one repository instance exists to manage stored measurement operations.
+
+---
+
+## 🔹 Data Transfer Objects (DTO)
+
+
+QuantityDTO
+
+
+Purpose:
+
+- Transfer data between controller and service layers
+
+Fields typically include:
+
+- value
+- unit
+- measurement type
+
+DTO objects contain **no business logic**.
+
+---
+
+## 🔹 Entity Layer
+
+
+QuantityMeasurementEntity
+
+
+Represents a stored record of a measurement operation.
+
+Contains information such as:
+
+- operand values
+- operation type
+- result
+- error message
+
+Implements:
+
+
+Serializable
+
+
+so operation history can be persisted.
+
+---
+
+## 🔄 Example Application Flow
+
+Example: **Length Equality Comparison**
+
+
+Controller receives QuantityDTO objects
+
+Controller calls Service.compare()
+
+Service converts DTO → QuantityModel
+
+Service performs equality check
+
+Service creates QuantityMeasurementEntity
+
+Repository stores operation
+
+Controller prints result
+
+
+---
+
+## 🧪 Example Demonstrations
+
+### 🔹 Example 1 — Length Equality
+
+
+2 ft == 24 in
+
+
+Output:
+
+
+--- Equality Demonstration ---
+Operation: COMPARISON
+This Quantity: 2.0 FEET
+That Quantity: 24.0 INCHES
+Comparison Result: true
+
+
+---
+
+### 🔹 Example 2 — Temperature Conversion
+
+
+0°C → Fahrenheit
+
+
+Output:
+
+
+Temperature conversion result: 32°F
+
+
+---
+
+### 🔹 Example 3 — Cross-Category Operation Prevention
+
+Attempt:
+
+
+2 ft + 10 kg
+
+
+Output:
+
+
+❌ Error: Cannot perform arithmetic between different measurement categories:
+LengthUnit and WeightUnit
+
+
+The service layer validates category compatibility before performing arithmetic.
 
 ---
 
 ## 🔒 Cross-Category Safety
 
-Temperature cannot be compared or combined with:
+The system prevents arithmetic operations across incompatible measurement domains.
 
-- Length
-- Weight
-- Volume
+Examples:
 
-Invalid example:
 
-```
-0°C == 1 ft → false
-```
+Length + Weight → Invalid
+Length + Temperature → Invalid
+Weight + Volume → Invalid
 
-Cross-category arithmetic throws `IllegalArgumentException`.
+
+These operations throw `IllegalArgumentException`.
 
 ---
 
 ## 📤 Postconditions
 
-- Temperature integrates without modifying core framework.
-- Non-linear unit conversion is fully supported.
-- All previous use cases remain functional.
-- Arithmetic logic remains centralized (UC13).
-- Immutability preserved.
+- Application logic is separated into layers
+- DTO objects standardize communication between layers
+- Repository stores operation history
+- Service layer centralizes business logic
+- Existing measurement features remain unchanged
+- System becomes scalable and testable
 
 ---
 
 ## 🧪 Key Concepts Tested
 
-### 🌡 Equality Tests
+### 🏗 Architecture Concepts
 
-- Celsius ↔ Fahrenheit equality
-- Celsius ↔ Kelvin equality
-- Fahrenheit ↔ Kelvin equality
-- Cross-category comparison prevention
+- N-Tier Architecture
+- Separation of Concerns
+- Layered System Design
 
----
+### 🔁 Design Patterns
 
-### 🔄 Conversion Tests
+- Singleton Pattern
+- Dependency Injection
+- DTO Pattern
 
-- Celsius to Fahrenheit
-- Fahrenheit to Celsius
-- Celsius to Kelvin
-- Kelvin to Celsius
-- Round-trip conversion validation
+### 📐 SOLID Principles
 
----
-
-### ➕ Arithmetic Tests
-
-- Addition in same unit
-- Subtraction in same unit
-- Centralized arithmetic validation
+- Single Responsibility Principle (SRP)
+- Open–Closed Principle (OCP)
+- Liskov Substitution Principle (LSP)
+- Interface Segregation Principle (ISP)
+- Dependency Inversion Principle (DIP)
 
 ---
 
 ## 🧠 Concepts Learned
 
-- Non-linear unit conversion
-- Offset-based transformation
-- Enum constant-specific behavior
-- Polymorphism through method overriding
-- Architectural scalability validation
-- Open–Closed Principle compliance
+- N-Tier architecture design
+- Service-oriented architecture
+- Data Transfer Object pattern
+- Repository abstraction
+- Dependency injection
+- Error handling as data
+- Scalable application structure
 
 ---
 
@@ -216,16 +320,26 @@ Cross-category arithmetic throws `IllegalArgumentException`.
 | UC12 | Subtraction & Division |
 | UC13 | Centralized arithmetic logic |
 | UC14 | Temperature measurement |
+| UC15 | N-Tier architecture refactoring |
 
 ---
 
 ## 🔥 Key Achievement
 
-UC14 proves that the system supports both:
+UC15 transforms the Quantity Measurement Application from a **single-layer demonstration program** into a **structured multi-layer architecture**.
 
-- Linear unit transformations (multiplicative)
-- Non-linear unit transformations (formula-based)
+This refactoring enables:
 
-Without changing the core arithmetic engine.
+- better maintainability
+- easier testing
+- scalable system design
+- readiness for enterprise applications
 
-This confirms the framework’s robustness, scalability, and extensibility across fundamentally different measurement domains.
+The system is now prepared for future extensions such as:
+
+- REST APIs
+- database persistence
+- web interfaces
+- microservices architecture.
+
+---
