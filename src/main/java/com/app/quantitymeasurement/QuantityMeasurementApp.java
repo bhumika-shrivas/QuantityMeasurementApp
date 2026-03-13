@@ -95,10 +95,5 @@ public class QuantityMeasurementApp {
         } catch (QuantityMeasurementException ex) {
             System.out.println("Cross-category addition not supported: " + ex.getMessage());
         }
-        
-        System.out.println("Saved measurements:");
-
-        repository.getAllMeasurements()
-                .forEach(System.out::println);
     }
 }

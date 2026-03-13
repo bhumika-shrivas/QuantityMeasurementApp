@@ -1,73 +1,95 @@
 package com.app.quantitymeasurement.util;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.Statement;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayDeque;
-import java.util.Queue;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.util.stream.Collectors;
 
-public class ConnectionPool {
+/**
+ * ConnectionPool backed by HikariCP.
+ * Provides application-wide DataSource and graceful shutdown hook.
+ */
+public final class ConnectionPool {
 
-    private static final Queue<Connection> pool = new ArrayDeque<>();
-    private static int maxPoolSize;
+    private static final HikariDataSource dataSource;
 
     static {
+        HikariDataSource ds = null;
         try {
             String url = ApplicationConfig.getProperty("db.url");
             String username = ApplicationConfig.getProperty("db.username");
             String password = ApplicationConfig.getProperty("db.password");
             String driver = ApplicationConfig.getProperty("db.driver");
+            String poolSize = ApplicationConfig.getProperty("db.pool.size");
 
-            maxPoolSize = Integer.parseInt(
-                    ApplicationConfig.getProperty("db.pool.size"));
-
-            Class.forName(driver);
-
-            for (int i = 0; i < maxPoolSize; i++) {
-                Connection connection =
-                        DriverManager.getConnection(url, username, password);
-                pool.add(connection);
+            HikariConfig config = new HikariConfig();
+            config.setJdbcUrl(url);
+            if (username != null) config.setUsername(username);
+            if (password != null) config.setPassword(password);
+            if (driver != null) config.setDriverClassName(driver);
+            if (poolSize != null) {
+                try { config.setMaximumPoolSize(Integer.parseInt(poolSize)); } catch (NumberFormatException ignored) {}
             }
 
-            // Run schema.sql to ensure tables exist (execute with a fresh connection)
-            try (Connection c = DriverManager.getConnection(url, username, password);
-                 Statement stmt = c.createStatement()) {
-                InputStream in = ConnectionPool.class.getClassLoader().getResourceAsStream("db/schema.sql");
-                if (in != null) {
-                    String sql = new BufferedReader(new InputStreamReader(in)).lines().collect(Collectors.joining("\n"));
-                    // Split by semicolon to handle multiple statements if present
+            ds = new HikariDataSource(config);
+
+            // Ensure schema exists by executing schema.sql using a fresh connection
+            InputStream in = ConnectionPool.class.getClassLoader().getResourceAsStream("db/schema.sql");
+            if (in != null) {
+                String sql = new BufferedReader(new InputStreamReader(in)).lines().collect(Collectors.joining("\n"));
+                try (Connection c = ds.getConnection(); Statement stmt = c.createStatement()) {
                     for (String s : sql.split(";")) {
                         String trimmed = s.trim();
-                        if (!trimmed.isEmpty()) {
-                            stmt.execute(trimmed);
-                        }
+                        if (!trimmed.isEmpty()) stmt.execute(trimmed);
                     }
                 }
             }
 
+            // register shutdown hook to close the datasource
+            HikariDataSource finalDs = ds;
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    if (finalDs != null && !finalDs.isClosed()) finalDs.close();
+                } catch (Exception ignored) {}
+            }));
+
         } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize connection pool", e);
+            if (ds != null) {
+                try { ds.close(); } catch (Exception ignore) {}
+            }
+            throw new RuntimeException("Failed to initialize HikariCP datasource", e);
         }
+        dataSource = ds;
     }
 
-    public static synchronized Connection getConnection() {
-        if (pool.isEmpty()) {
-            throw new RuntimeException("No available database connections");
-        }
-        return pool.poll();
+    private ConnectionPool() { /* utility class */ }
+
+    public static Connection getConnection() throws java.sql.SQLException {
+        return dataSource.getConnection();
     }
 
-    public static synchronized void releaseConnection(Connection connection) {
+    /**
+     * Release connection back to the pool (close returns it to HikariCP)
+     */
+    public static void releaseConnection(Connection connection) {
         if (connection != null) {
-            pool.offer(connection);
+            try { connection.close(); } catch (Exception ignored) {}
         }
     }
 
     public static int getAvailableConnections() {
-        return pool.size();
+        // Hikari does not expose exact available connections easily; return -1 as unknown
+        return -1;
+    }
+
+    public static void shutdown() {
+        if (dataSource != null && !dataSource.isClosed()) {
+            dataSource.close();
+        }
     }
 }
