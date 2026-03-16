@@ -1,39 +1,43 @@
-# ✅ UC15: N-Tier Architecture Refactoring for Quantity Measurement Application
+# ✅ UC16: Database Integration with JDBC for Quantity Measurement Persistence
 
 ## 📖 Description
 
-UC15 refactors the Quantity Measurement Application into a **clean N-Tier architecture** to improve maintainability, scalability, and separation of concerns.
+UC16 extends the Quantity Measurement Application by introducing **persistent database storage using JDBC**.
 
-Previous use cases (UC1–UC14) implemented measurement logic inside a single application layer. While functional, this structure mixed responsibilities such as input handling, business logic, and data representation.
+In UC15, the application implemented a clean **N-Tier architecture**, but the repository layer stored measurement history only in **in-memory cache with optional serialization**. This approach had several limitations such as limited scalability, lack of concurrent access management, and difficulty in querying stored data.
 
-UC15 restructures the system into layered architecture consisting of:
+UC16 enhances the repository layer by integrating a **relational database using JDBC** so that measurement operations are permanently stored.
 
-- Controller Layer
-- Service Layer
-- Repository Layer
-- Entity / Model Layer
-- Data Transfer Objects (DTO)
+The application now supports:
 
-This refactoring introduces **professional application architecture patterns** while preserving all existing measurement functionality.
+- JDBC database communication
+- Connection pooling
+- SQL-based data persistence
+- Automatic schema creation
+- Professional Maven project configuration
+- Structured logging
+- Database-backed repository implementation
+
+This upgrade moves the application closer to **enterprise-grade architecture**.
 
 ---
 
 ## 🎯 Objective
 
-- Refactor the application into **N-Tier architecture**
-- Introduce **DTO objects** for data transfer
-- Introduce **Service layer** for business logic
-- Introduce **Repository layer** for data storage
-- Introduce **Entity layer** for operation records
-- Improve **testability and scalability**
-- Preserve all functionality from **UC1–UC14**
-- Ensure clear separation of responsibilities
+- Integrate **database persistence using JDBC**
+- Replace in-memory repository with **database repository implementation**
+- Store measurement operations in a **relational database**
+- Introduce **connection pooling**
+- Implement **SQL-based storage**
+- Configure project using **Maven dependencies**
+- Maintain full compatibility with **UC1–UC15 functionality**
+- Enable **operation history tracking**
 
 ---
 
-## 🏗 N-Tier Architecture
+## 🏗 Updated Architecture
 
-The application now follows the layered architecture below:
+The application now follows the architecture below:
 
 
 Application Layer
@@ -44,10 +48,10 @@ Service Layer
 ↓
 Repository Layer
 ↓
-Entity / Model Layer
+Database (H2)
 
 
-Each layer performs a specific role and communicates through clearly defined interfaces.
+The repository layer communicates with the database using **JDBC connections managed by a connection pool**.
 
 ---
 
@@ -60,11 +64,11 @@ QuantityMeasurementController
 Responsibilities:
 
 - Accept `QuantityDTO` input objects
-- Validate input parameters
-- Delegate operations to service layer
-- Display results or error messages
+- Validate user inputs
+- Call service layer operations
+- Return formatted results to the application
 
-Supported operations:
+Supported operations include:
 
 - Comparison
 - Conversion
@@ -72,7 +76,7 @@ Supported operations:
 - Subtraction
 - Division
 
-The controller contains **no business logic**.
+The controller **does not interact with the database directly**.
 
 ---
 
@@ -85,14 +89,14 @@ QuantityMeasurementServiceImpl
 
 Responsibilities:
 
-- Perform all measurement operations
-- Convert DTO objects to internal models
-- Validate category compatibility
-- Execute arithmetic operations
+- Execute all measurement operations
+- Convert DTO objects to internal domain objects
+- Validate measurement categories
+- Perform arithmetic logic
 - Handle exceptions
-- Create entity records for repository
+- Create operation entities for persistence
 
-The service layer represents the **core business logic** of the application.
+The service layer now **delegates storage responsibilities to the repository layer**, without knowing whether storage is in memory or database.
 
 ---
 
@@ -100,67 +104,90 @@ The service layer represents the **core business logic** of the application.
 
 
 IQuantityMeasurementRepository
-QuantityMeasurementCacheRepository
+QuantityMeasurementDatabaseRepository
+
+
+UC16 introduces a new repository implementation:
+
+
+QuantityMeasurementDatabaseRepository
 
 
 Responsibilities:
 
-- Store operation records
-- Maintain in-memory cache
-- Persist history using serialization
+- Persist measurement operations using JDBC
+- Execute SQL queries
+- Manage database connections through a connection pool
+- Retrieve stored measurement records
+- Handle database exceptions
 
-Design Pattern used:
-
-
-Singleton Pattern
-
-
-Only one repository instance exists to manage stored measurement operations.
+SQL operations use **PreparedStatement** to prevent SQL injection.
 
 ---
 
-## 🔹 Data Transfer Objects (DTO)
+## 🔹 Database Layer
+
+UC16 introduces a relational database using:
 
 
-QuantityDTO
+H2 In-Memory Database
 
 
-Purpose:
+The database schema is automatically created using:
 
-- Transfer data between controller and service layers
 
-Fields typically include:
+schema.sql
 
-- value
-- unit
-- measurement type
 
-DTO objects contain **no business logic**.
+### Table Structure
+
+| Column | Description |
+|------|-------------|
+| id | Unique record identifier |
+| operand1 | First measurement operand |
+| operand2 | Second measurement operand |
+| operation_type | Operation performed |
+| result | Operation result |
+| error_message | Error details if operation fails |
+| timestamp | Time of operation |
+
+Each measurement operation is stored as a database record.
 
 ---
 
-## 🔹 Entity Layer
+## 🔹 Connection Pool
+
+Database connections are managed using:
 
 
-QuantityMeasurementEntity
+HikariCP
 
 
-Represents a stored record of a measurement operation.
+Benefits:
 
-Contains information such as:
+- Efficient connection reuse
+- Improved application performance
+- Reduced connection overhead
+- Production-grade connection management
 
-- operand values
-- operation type
-- result
-- error message
+The connection pool initializes when the application starts and shuts down when the application exits.
 
-Implements:
+---
 
+## 🔹 Logging Framework
 
-Serializable
+UC16 introduces structured logging using:
 
 
-so operation history can be persisted.
+SLF4J + Logback
+
+
+Logging is used for:
+
+- database initialization
+- connection pool status
+- system events
+- debugging information
 
 ---
 
@@ -173,13 +200,15 @@ Controller receives QuantityDTO objects
 
 Controller calls Service.compare()
 
-Service converts DTO → QuantityModel
+Service converts DTO → Quantity domain model
 
 Service performs equality check
 
 Service creates QuantityMeasurementEntity
 
-Repository stores operation
+Repository executes SQL INSERT
+
+Database stores measurement record
 
 Controller prints result
 
@@ -190,6 +219,8 @@ Controller prints result
 
 ### 🔹 Example 1 — Length Equality
 
+Input:
+
 
 2 ft == 24 in
 
@@ -197,16 +228,23 @@ Controller prints result
 Output:
 
 
---- Equality Demonstration ---
-Operation: COMPARISON
-This Quantity: 2.0 FEET
-That Quantity: 24.0 INCHES
-Comparison Result: true
+Comparison result: Result: value=0.0, unit=FEET, type=LENGTH
+
+
+Database Record:
+
+
+operand1: 2 FEET
+operand2: 24 INCHES
+operation_type: COMPARE
+result: Result: value=0.0, unit=FEET, type=LENGTH
 
 
 ---
 
 ### 🔹 Example 2 — Temperature Conversion
+
+Input:
 
 
 0°C → Fahrenheit
@@ -215,12 +253,19 @@ Comparison Result: true
 Output:
 
 
-Temperature conversion result: 32°F
+Temperature conversion result: Result: value=32.0, unit=FAHRENHEIT, type=TEMPERATURE
+
+
+Database Record:
+
+
+operation_type: CONVERT
+result: 32°F
 
 
 ---
 
-### 🔹 Example 3 — Cross-Category Operation Prevention
+### 🔹 Example 3 — Cross Category Operation Prevention
 
 Attempt:
 
@@ -231,38 +276,32 @@ Attempt:
 Output:
 
 
-❌ Error: Cannot perform arithmetic between different measurement categories:
-LengthUnit and WeightUnit
+Cross-category addition not supported: Cross-category operation not allowed
 
 
-The service layer validates category compatibility before performing arithmetic.
+The failed operation is also recorded with an **error message**.
 
 ---
 
-## 🔒 Cross-Category Safety
+## 🔒 Data Integrity
 
-The system prevents arithmetic operations across incompatible measurement domains.
+UC16 ensures secure and consistent database operations using:
 
-Examples:
-
-
-Length + Weight → Invalid
-Length + Temperature → Invalid
-Weight + Volume → Invalid
-
-
-These operations throw `IllegalArgumentException`.
+- Prepared SQL statements
+- Connection pooling
+- Exception handling
+- Repository abstraction
 
 ---
 
 ## 📤 Postconditions
 
-- Application logic is separated into layers
-- DTO objects standardize communication between layers
-- Repository stores operation history
-- Service layer centralizes business logic
-- Existing measurement features remain unchanged
-- System becomes scalable and testable
+- Database persistence is enabled
+- Measurement operations are stored in relational tables
+- Application architecture remains layered
+- Repository implementation can switch between cache and database
+- All UC1–UC15 functionality continues to work
+- Application becomes ready for enterprise data storage
 
 ---
 
@@ -271,34 +310,33 @@ These operations throw `IllegalArgumentException`.
 ### 🏗 Architecture Concepts
 
 - N-Tier Architecture
-- Separation of Concerns
-- Layered System Design
+- Repository Pattern
+- Layered Application Design
+
+### 🗄 Database Concepts
+
+- JDBC API
+- SQL Persistence
+- Connection Pooling
+- Database Schema Management
 
 ### 🔁 Design Patterns
 
-- Singleton Pattern
+- Repository Pattern
 - Dependency Injection
 - DTO Pattern
-
-### 📐 SOLID Principles
-
-- Single Responsibility Principle (SRP)
-- Open–Closed Principle (OCP)
-- Liskov Substitution Principle (LSP)
-- Interface Segregation Principle (ISP)
-- Dependency Inversion Principle (DIP)
 
 ---
 
 ## 🧠 Concepts Learned
 
-- N-Tier architecture design
-- Service-oriented architecture
-- Data Transfer Object pattern
-- Repository abstraction
-- Dependency injection
-- Error handling as data
-- Scalable application structure
+- JDBC database integration
+- Connection pool management
+- SQL query execution
+- Persistent data storage
+- Database-backed repository design
+- Logging configuration
+- Maven dependency management
 
 ---
 
@@ -321,25 +359,27 @@ These operations throw `IllegalArgumentException`.
 | UC13 | Centralized arithmetic logic |
 | UC14 | Temperature measurement |
 | UC15 | N-Tier architecture refactoring |
+| UC16 | Database persistence using JDBC |
 
 ---
 
 ## 🔥 Key Achievement
 
-UC15 transforms the Quantity Measurement Application from a **single-layer demonstration program** into a **structured multi-layer architecture**.
+UC16 upgrades the application from an **in-memory demonstration system** to a **database-backed enterprise-style architecture**.
 
-This refactoring enables:
+The system now supports:
 
-- better maintainability
-- easier testing
-- scalable system design
-- readiness for enterprise applications
+- persistent storage of operations
+- scalable data management
+- structured logging
+- production-grade connection pooling
 
-The system is now prepared for future extensions such as:
+This prepares the application for future extensions such as:
 
 - REST APIs
-- database persistence
-- web interfaces
-- microservices architecture.
+- Spring Boot integration
+- Web interfaces
+- distributed microservices
+- advanced analytics on measurement history.
 
 ---
