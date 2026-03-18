@@ -1,349 +1,420 @@
-# ✅ UC16: Database Integration with JDBC for Quantity Measurement Persistence
+# ✅ UC17: Spring Framework Integration - REST Services and JPA for Quantity Measurement
 
 ## 📖 Description
 
-UC16 extends the Quantity Measurement Application by introducing **persistent database storage using JDBC**.
+UC17 transforms the Quantity Measurement Application into a **production-grade Spring Boot REST service**.
 
-In UC15, the application implemented a clean **N-Tier architecture**, but the repository layer stored measurement history only in **in-memory cache with optional serialization**. This approach had several limitations such as limited scalability, lack of concurrent access management, and difficulty in querying stored data.
+In UC16, the application implemented **JDBC-based database persistence**, but still required significant boilerplate code — manual connection management, raw SQL queries, manual JSON handling, and no HTTP exposure.
 
-UC16 enhances the repository layer by integrating a **relational database using JDBC** so that measurement operations are permanently stored.
+UC17 eliminates all of this by leveraging the **Spring Boot ecosystem**:
 
-The application now supports:
+- Spring Boot replaces manual application wiring
+- Spring Data JPA replaces all JDBC boilerplate
+- Spring MVC exposes REST API endpoints
+- Spring Security provides a security foundation
+- Swagger/OpenAPI generates interactive API documentation
+- Spring Boot Actuator enables health monitoring
 
-- JDBC database communication
-- Connection pooling
-- SQL-based data persistence
-- Automatic schema creation
-- Professional Maven project configuration
-- Structured logging
-- Database-backed repository implementation
-
-This upgrade moves the application closer to **enterprise-grade architecture**.
+UC17 is **fully backward compatible** with UC1–UC16. All business logic is preserved with identical results.
 
 ---
 
 ## 🎯 Objective
 
-- Integrate **database persistence using JDBC**
-- Replace in-memory repository with **database repository implementation**
-- Store measurement operations in a **relational database**
-- Introduce **connection pooling**
-- Implement **SQL-based storage**
-- Configure project using **Maven dependencies**
-- Maintain full compatibility with **UC1–UC15 functionality**
-- Enable **operation history tracking**
+- Expose measurement operations as **RESTful HTTP endpoints**
+- Replace manual JDBC code with **Spring Data JPA**
+- Enable **dependency injection** via Spring IoC container
+- Implement **centralized exception handling** using `@ControllerAdvice`
+- Add **input validation** using Bean Validation annotations
+- Generate **interactive API documentation** using Swagger UI
+- Enable **application monitoring** using Spring Boot Actuator
+- Maintain full compatibility with **UC1–UC16 functionality**
 
 ---
 
 ## 🏗 Updated Architecture
+```
+Client (curl / Postman / Swagger UI)
+            ↓  HTTP Request (JSON)
+    REST Controller Layer          @RestController
+            ↓
+    Service Layer                  @Service
+            ↓
+    Repository Layer               @Repository (Spring Data JPA)
+            ↓
+    Database (H2 In-Memory)        JPA / Hibernate
+```
 
-The application now follows the architecture below:
-
-
-Application Layer
-↓
-Controller Layer
-↓
-Service Layer
-↓
-Repository Layer
-↓
-Database (H2)
-
-
-The repository layer communicates with the database using **JDBC connections managed by a connection pool**.
+Spring IoC container manages all dependencies automatically — no manual object creation or wiring.
 
 ---
 
-## 🔹 Controller Layer
+## 🔹 What Changed vs UC16
 
+| Aspect | UC16 | UC17 |
+|--------|------|------|
+| HTTP Exposure | None | REST API on port 8080 |
+| Data Access | Manual JDBC + HikariCP | Spring Data JPA (zero SQL) |
+| Dependency Injection | Manual constructor injection | `@Autowired` by Spring |
+| JSON Handling | Manual / Jackson setup | Auto-serialized by Spring MVC |
+| Exception Handling | Per-method try-catch | Centralized `@ControllerAdvice` |
+| Input Validation | Manual null checks | `@Valid`, `@NotNull`, `@Pattern` |
+| API Documentation | None | Swagger UI at `/swagger-ui.html` |
+| Transaction Management | Manual | `@Transactional` declarative |
+| Monitoring | None | Actuator at `/actuator/health` |
+| Testing | Manual integration tests | MockMvc + `@SpringBootTest` |
 
+---
+
+## 🔹 Layer-by-Layer Breakdown
+
+### REST Controller Layer
+```
 QuantityMeasurementController
+```
 
+**Annotations used:**
+- `@RestController` — marks class as REST controller, returns JSON automatically
+- `@RequestMapping("/api/v1/quantities")` — base URL for all endpoints
+- `@PostMapping`, `@GetMapping` — maps HTTP verbs to methods
+- `@RequestBody` — deserializes incoming JSON to Java object
+- `@PathVariable` — extracts value from URL path
+- `@Valid` — triggers Bean Validation on incoming DTOs
+- `@Operation`, `@Tag` — Swagger documentation annotations
 
-Responsibilities:
+**Supported endpoints:**
 
-- Accept `QuantityDTO` input objects
-- Validate user inputs
-- Call service layer operations
-- Return formatted results to the application
-
-Supported operations include:
-
-- Comparison
-- Conversion
-- Addition
-- Subtraction
-- Division
-
-The controller **does not interact with the database directly**.
+| Method | URL | Description |
+|--------|-----|-------------|
+| POST | `/api/v1/quantities/compare` | Compare two quantities |
+| POST | `/api/v1/quantities/convert` | Convert a quantity to another unit |
+| POST | `/api/v1/quantities/add` | Add two quantities |
+| POST | `/api/v1/quantities/subtract` | Subtract two quantities |
+| POST | `/api/v1/quantities/divide` | Divide two quantities |
+| GET | `/api/v1/quantities/history/operation/{operation}` | Get history by operation type |
+| GET | `/api/v1/quantities/history/type/{measurementType}` | Get history by measurement type |
+| GET | `/api/v1/quantities/history/errored` | Get all error records |
+| GET | `/api/v1/quantities/count/{operation}` | Count successful operations |
 
 ---
 
-## 🔹 Service Layer
-
-
+### Service Layer
+```
 IQuantityMeasurementService
 QuantityMeasurementServiceImpl
+```
 
-
-Responsibilities:
-
-- Execute all measurement operations
-- Convert DTO objects to internal domain objects
-- Validate measurement categories
-- Perform arithmetic logic
-- Handle exceptions
-- Create operation entities for persistence
-
-The service layer now **delegates storage responsibilities to the repository layer**, without knowing whether storage is in memory or database.
+**Key changes from UC16:**
+- Added `@Service` annotation — Spring registers and manages this bean
+- Added `@Autowired` — Spring injects repository automatically
+- All operation methods now return `QuantityMeasurementDTO` instead of raw `QuantityDTO`
+- Added 4 new history/count methods
+- `convertDtoToModel()` replaces old `QuantityMapper` dependency
+- Errors are saved to the database for audit tracking
 
 ---
 
-## 🔹 Repository Layer
+### Repository Layer
+```
+QuantityMeasurementRepository  (extends JpaRepository)
+```
 
+This single interface **replaces all UC16 JDBC code** — no SQL, no ResultSet, no try-catch.
 
-IQuantityMeasurementRepository
-QuantityMeasurementDatabaseRepository
+Spring Data JPA auto-generates implementation from method names:
 
+| Method | Generated SQL |
+|--------|--------------|
+| `findByOperation(String op)` | `WHERE operation = ?` |
+| `findByThisMeasurementType(String type)` | `WHERE this_measurement_type = ?` |
+| `findByCreatedAtAfter(LocalDateTime date)` | `WHERE created_at > ?` |
+| `findByIsErrorTrue()` | `WHERE is_error = true` |
+| `countByOperationAndIsErrorFalse(String op)` | `COUNT(*) WHERE operation = ? AND is_error = false` |
 
-UC16 introduces a new repository implementation:
-
-
-QuantityMeasurementDatabaseRepository
-
-
-Responsibilities:
-
-- Persist measurement operations using JDBC
-- Execute SQL queries
-- Manage database connections through a connection pool
-- Retrieve stored measurement records
-- Handle database exceptions
-
-SQL operations use **PreparedStatement** to prevent SQL injection.
+`JpaRepository` also provides for free: `save()`, `findAll()`, `findById()`, `deleteById()`, `count()`
 
 ---
 
-## 🔹 Database Layer
+### Model / Entity Layer
+```
+QuantityMeasurementEntity  (JPA Entity)
+```
 
-UC16 introduces a relational database using:
+**JPA annotations added:**
+- `@Entity` — maps class to database table
+- `@Table(name = "quantity_measurements")` — specifies table name with indexes
+- `@Id` + `@GeneratedValue` — auto-increment primary key
+- `@Column` — column constraints
+- `@PrePersist` / `@PreUpdate` — auto-sets `createdAt` and `updatedAt` timestamps
 
-
-H2 In-Memory Database
-
-
-The database schema is automatically created using:
-
-
-schema.sql
-
-
-### Table Structure
-
-| Column | Description |
-|------|-------------|
-| id | Unique record identifier |
-| operand1 | First measurement operand |
-| operand2 | Second measurement operand |
-| operation_type | Operation performed |
-| result | Operation result |
-| error_message | Error details if operation fails |
-| timestamp | Time of operation |
-
-Each measurement operation is stored as a database record.
+**Lombok annotations added:**
+- `@Data` — generates all getters, setters, equals, hashCode, toString
+- `@NoArgsConstructor` — required by JPA
+- `@AllArgsConstructor` — full constructor
 
 ---
 
-## 🔹 Connection Pool
+### DTO Layer
 
-Database connections are managed using:
+**New/Updated DTOs:**
 
-
-HikariCP
-
-
-Benefits:
-
-- Efficient connection reuse
-- Improved application performance
-- Reduced connection overhead
-- Production-grade connection management
-
-The connection pool initializes when the application starts and shuts down when the application exits.
+| Class | Purpose |
+|-------|---------|
+| `QuantityDTO` | Input DTO with `@NotNull`, `@NotEmpty`, `@Pattern`, `@AssertTrue` validation |
+| `QuantityInputDTO` | Wraps two `QuantityDTO`s for REST request body |
+| `QuantityMeasurementDTO` | Rich response DTO with `fromEntity()`, `toEntity()`, `fromEntityList()` factory methods |
+| `OperationType` | Enum: `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, `COMPARE`, `CONVERT` |
 
 ---
 
-## 🔹 Logging Framework
+### Exception Handling
+```
+GlobalExceptionHandler  (@RestControllerAdvice)
+```
 
-UC16 introduces structured logging using:
+Centralized handler for all exceptions across all controllers:
 
+| Handler | Handles | HTTP Status |
+|---------|---------|-------------|
+| `handleValidationException` | `@Valid` failures | 400 Bad Request |
+| `handleQuantityException` | `QuantityMeasurementException` | 400 Bad Request |
+| `handleGlobalException` | All other exceptions | 500 Internal Server Error |
 
-SLF4J + Logback
-
-
-Logging is used for:
-
-- database initialization
-- connection pool status
-- system events
-- debugging information
-
----
-
-## 🔄 Example Application Flow
-
-Example: **Length Equality Comparison**
-
-
-Controller receives QuantityDTO objects
-
-Controller calls Service.compare()
-
-Service converts DTO → Quantity domain model
-
-Service performs equality check
-
-Service creates QuantityMeasurementEntity
-
-Repository executes SQL INSERT
-
-Database stores measurement record
-
-Controller prints result
-
+**Error response format:**
+```json
+{
+  "timestamp": "2026-03-18T11:15:10",
+  "status": 400,
+  "error": "Quantity Measurement Error",
+  "message": "Unit must be valid for the specified measurement type",
+  "path": "/api/v1/quantities/add"
+}
+```
 
 ---
 
-## 🧪 Example Demonstrations
+### Security Configuration
+```
+SecurityConfig  (@Configuration)
+```
 
-### 🔹 Example 1 — Length Equality
-
-Input:
-
-
-2 ft == 24 in
-
-
-Output:
-
-
-Comparison result: Result: value=0.0, unit=FEET, type=LENGTH
-
-
-Database Record:
-
-
-operand1: 2 FEET
-operand2: 24 INCHES
-operation_type: COMPARE
-result: Result: value=0.0, unit=FEET, type=LENGTH
-
+Configured to **allow all requests** for development. Provides the foundation for adding JWT or OAuth2 authentication in future use cases. CSRF disabled for stateless REST API. H2 console frame access enabled.
 
 ---
 
-### 🔹 Example 2 — Temperature Conversion
+## ⚙️ application.properties
+```properties
+spring.application.name=quantity-measurement-app
 
-Input:
+# H2 In-Memory Database
+spring.datasource.url=jdbc:h2:mem:quantitymeasurementdb;DB_CLOSE_DELAY=-1
+spring.datasource.driver-class-name=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
 
+# JPA / Hibernate
+spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
+spring.jpa.hibernate.ddl-auto=create-drop
+spring.jpa.show-sql=true
 
-0°C → Fahrenheit
+# H2 Console
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
 
+# Swagger
+springdoc.swagger-ui.path=/swagger-ui.html
+springdoc.api-docs.path=/api-docs
 
-Output:
+# Actuator
+management.endpoints.web.exposure.include=health,info,metrics
 
-
-Temperature conversion result: Result: value=32.0, unit=FAHRENHEIT, type=TEMPERATURE
-
-
-Database Record:
-
-
-operation_type: CONVERT
-result: 32°F
-
-
----
-
-### 🔹 Example 3 — Cross Category Operation Prevention
-
-Attempt:
-
-
-2 ft + 10 kg
-
-
-Output:
-
-
-Cross-category addition not supported: Cross-category operation not allowed
-
-
-The failed operation is also recorded with an **error message**.
+# Server
+server.port=8080
+```
 
 ---
 
-## 🔒 Data Integrity
+## 🔥 Key Maven Dependencies Added
+```xml
+spring-boot-starter-web          <!-- Tomcat + Spring MVC + REST + JSON -->
+spring-boot-starter-data-jpa     <!-- Hibernate ORM + Spring Data -->
+spring-boot-starter-validation   <!-- @NotNull, @Valid etc. -->
+spring-boot-starter-security     <!-- Security foundation -->
+spring-boot-starter-actuator     <!-- /actuator/health, /metrics -->
+h2                               <!-- In-memory database -->
+lombok                           <!-- @Data, @Builder etc. -->
+springdoc-openapi-starter-webmvc-ui  <!-- Swagger UI -->
+spring-boot-starter-test         <!-- MockMvc + SpringBootTest -->
+```
 
-UC16 ensures secure and consistent database operations using:
+---
 
-- Prepared SQL statements
-- Connection pooling
-- Exception handling
-- Repository abstraction
+## 🧪 Testing
+
+### Unit Tests — MockMvc
+```
+@WebMvcTest(QuantityMeasurementController.class)
+```
+
+- Loads only the controller layer — no database needed
+- `@MockBean` mocks the service layer
+- Tests HTTP status codes, response JSON, validation failures
+
+### Integration Tests — Spring Boot Test
+```
+@SpringBootTest(webEnvironment = RANDOM_PORT)
+```
+
+- Starts the full application context
+- Uses `TestRestTemplate` to make real HTTP calls
+- Tests end-to-end: Controller → Service → Repository → H2 DB
+
+---
+
+## 🚀 How to Run
+```bash
+# Build and compile
+mvn clean compile
+
+# Run all tests
+mvn test
+
+# Start Spring Boot application
+mvn spring-boot:run
+```
+
+---
+
+## 🌐 Access Points
+
+| URL | Description |
+|-----|-------------|
+| `http://localhost:8080/api/v1/quantities/compare` | Compare endpoint |
+| `http://localhost:8080/swagger-ui.html` | Interactive API documentation |
+| `http://localhost:8080/api-docs` | Raw OpenAPI JSON spec |
+| `http://localhost:8080/h2-console` | H2 Database console |
+| `http://localhost:8080/actuator/health` | Application health check |
+| `http://localhost:8080/actuator/metrics` | Application metrics |
+
+**H2 Console credentials:**
+- JDBC URL: `jdbc:h2:mem:quantitymeasurementdb`
+- Username: `sa`
+- Password: *(leave blank)*
+
+---
+
+## 🧪 Sample curl Commands
+
+### Compare 1 foot vs 12 inches
+```bash
+curl -X POST http://localhost:8080/api/v1/quantities/compare \
+  -H "Content-Type: application/json" \
+  -d '{
+    "thisQuantityDTO": {"value": 1.0, "unit": "FEET", "measurementType": "LengthUnit"},
+    "thatQuantityDTO": {"value": 12.0, "unit": "INCHES", "measurementType": "LengthUnit"}
+  }'
+```
+
+**Response:**
+```json
+{
+  "id": 1,
+  "thisValue": 1.0,
+  "thisUnit": "FEET",
+  "thisMeasurementType": "LengthUnit",
+  "thatValue": 12.0,
+  "thatUnit": "INCHES",
+  "thatMeasurementType": "LengthUnit",
+  "operation": "COMPARE",
+  "resultValue": "true",
+  "error": false,
+  "createdAt": "2026-03-18T11:15:10"
+}
+```
+
+### Add 1 foot + 12 inches
+```bash
+curl -X POST http://localhost:8080/api/v1/quantities/add \
+  -H "Content-Type: application/json" \
+  -d '{
+    "thisQuantityDTO": {"value": 1.0, "unit": "FEET", "measurementType": "LengthUnit"},
+    "thatQuantityDTO": {"value": 12.0, "unit": "INCHES", "measurementType": "LengthUnit"}
+  }'
+```
+
+### Get history of all ADD operations
+```bash
+curl http://localhost:8080/api/v1/quantities/history/operation/ADD
+```
+
+### Error scenario — cross-category operation
+```bash
+curl -X POST http://localhost:8080/api/v1/quantities/add \
+  -H "Content-Type: application/json" \
+  -d '{
+    "thisQuantityDTO": {"value": 1.0, "unit": "FEET",     "measurementType": "LengthUnit"},
+    "thatQuantityDTO": {"value": 1.0, "unit": "KILOGRAM", "measurementType": "WeightUnit"}
+  }'
+```
+
+**Error Response:**
+```json
+{
+  "timestamp": "2026-03-18T11:15:10",
+  "status": 400,
+  "error": "Quantity Measurement Error",
+  "message": "add Error: Cannot perform arithmetic between different measurement categories",
+  "path": "/api/v1/quantities/add"
+}
+```
+
+---
+
+## 🧠 Spring Boot Concepts Learned
+
+| Annotation | Layer | What it does |
+|-----------|-------|-------------|
+| `@SpringBootApplication` | Main class | Auto-config + component scan + bean registration |
+| `@RestController` | Controller | Marks REST controller, returns JSON automatically |
+| `@RequestMapping` | Controller | Sets base URL for all endpoints |
+| `@PostMapping` / `@GetMapping` | Method | Maps HTTP POST/GET to method |
+| `@RequestBody` | Param | Deserializes JSON body to Java object |
+| `@PathVariable` | Param | Extracts `{value}` from URL |
+| `@Valid` | Param | Triggers Bean Validation |
+| `@Service` | Service class | Registers as Spring service bean |
+| `@Repository` | Repository | Registers JPA repo, enables exception translation |
+| `@Autowired` | Field | Spring injects matching bean automatically |
+| `@Entity` | Model class | Maps class to database table |
+| `@Id` + `@GeneratedValue` | Field | Primary key with auto-increment |
+| `@PrePersist` / `@PreUpdate` | Method | Lifecycle hooks for timestamps |
+| `@Data` (Lombok) | Class | Generates all boilerplate |
+| `@Builder` (Lombok) | Class | Enables builder pattern |
+| `@RestControllerAdvice` | Exception class | Global exception handling |
+| `@ExceptionHandler` | Method | Handles specific exception type |
+| `@WebMvcTest` | Test class | Controller unit test — no DB |
+| `@SpringBootTest` | Test class | Full integration test |
+| `@MockBean` | Test field | Mocks a Spring bean in tests |
 
 ---
 
 ## 📤 Postconditions
 
-- Database persistence is enabled
-- Measurement operations are stored in relational tables
-- Application architecture remains layered
-- Repository implementation can switch between cache and database
-- All UC1–UC15 functionality continues to work
-- Application becomes ready for enterprise data storage
-
----
-
-## 🧪 Key Concepts Tested
-
-### 🏗 Architecture Concepts
-
-- N-Tier Architecture
-- Repository Pattern
-- Layered Application Design
-
-### 🗄 Database Concepts
-
-- JDBC API
-- SQL Persistence
-- Connection Pooling
-- Database Schema Management
-
-### 🔁 Design Patterns
-
-- Repository Pattern
-- Dependency Injection
-- DTO Pattern
-
----
-
-## 🧠 Concepts Learned
-
-- JDBC database integration
-- Connection pool management
-- SQL query execution
-- Persistent data storage
-- Database-backed repository design
-- Logging configuration
-- Maven dependency management
+- Spring Boot application runs on embedded Tomcat at port 8080 ✅
+- REST endpoints accessible at `http://localhost:8080/api/v1/quantities/*` ✅
+- JPA entities auto-mapped to H2 database tables ✅
+- Swagger UI accessible at `http://localhost:8080/swagger-ui.html` ✅
+- H2 console accessible at `http://localhost:8080/h2-console` ✅
+- All UC1–UC16 business logic preserved with identical results ✅
+- Dependency injection managed by Spring IoC container ✅
+- Exception handling centralized through `@ControllerAdvice` ✅
+- Actuator endpoints available for monitoring ✅
 
 ---
 
 ## 🚀 Architectural Evolution
 
 | Use Case | Capability Added |
-|----------|------------------|
+|----------|-----------------|
 | UC1 | Feet equality |
 | UC2 | Inch equality |
 | UC3 | Generic Length |
@@ -358,28 +429,21 @@ UC16 ensures secure and consistent database operations using:
 | UC12 | Subtraction & Division |
 | UC13 | Centralized arithmetic logic |
 | UC14 | Temperature measurement |
-| UC15 | N-Tier architecture refactoring |
-| UC16 | Database persistence using JDBC |
+| UC15 | N-Tier architecture |
+| UC16 | JDBC database persistence |
+| **UC17** | **Spring Boot REST API + JPA** |
 
 ---
 
 ## 🔥 Key Achievement
 
-UC16 upgrades the application from an **in-memory demonstration system** to a **database-backed enterprise-style architecture**.
+UC17 transforms the application from a **database-backed console app** into a **fully functional REST microservice**.
 
 The system now supports:
-
-- persistent storage of operations
-- scalable data management
-- structured logging
-- production-grade connection pooling
-
-This prepares the application for future extensions such as:
-
-- REST APIs
-- Spring Boot integration
-- Web interfaces
-- distributed microservices
-- advanced analytics on measurement history.
+- HTTP-based access from any client (browser, Postman, curl, mobile app)
+- Persistent operation history queryable via REST
+- Interactive API documentation via Swagger
+- Enterprise-grade dependency injection and transaction management
+- Foundation for future enhancements: JWT security, cloud deployment, microservices
 
 ---
