@@ -2,7 +2,7 @@ package com.app.quantitymeasurement.repository;
 
 import java.util.List;
 
-import com.app.quantitymeasurement.entity.QuantityMeasurementEntity;
+import com.app.quantitymeasurement.model.QuantityMeasurementEntity;
 
 /**
  * Repository interface that abstracts persistence of quantity measurement records.

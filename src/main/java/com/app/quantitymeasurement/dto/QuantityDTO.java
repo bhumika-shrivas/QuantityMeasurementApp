@@ -1,53 +1,37 @@
 package com.app.quantitymeasurement.dto;
 
-/**
- * Data Transfer Object for Quantity operations.
- * Used between Controller and Service layers. No business logic here — just data.
- */
+import jakarta.validation.constraints.*;
+import lombok.*;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class QuantityDTO {
-    private double value;
+
+    @NotNull(message = "value is required")
+    private Double value;
+
+    @NotEmpty(message = "unit is required")
     private String unit;
+
+    @NotEmpty(message = "measurementType is required")
+    @Pattern(
+        regexp = "LengthUnit|WeightUnit|VolumeUnit|TemperatureUnit",
+        message = "measurementType must be LengthUnit|WeightUnit|VolumeUnit|TemperatureUnit"
+    )
     private String measurementType;
 
-    public QuantityDTO() {
-    }
+    private String operationType;
 
-    public QuantityDTO(double value, String unit, String measurementType) {
-        this.value = value;
-        this.unit = unit;
-        this.measurementType = measurementType;
-    }
-
-    public double getValue() {
-        return value;
-    }
-
-    public void setValue(double value) {
-        this.value = value;
-    }
-
-    public String getUnit() {
-        return unit;
-    }
-
-    public void setUnit(String unit) {
-        this.unit = unit;
-    }
-
-    public String getMeasurementType() {
-        return measurementType;
-    }
-
-    public void setMeasurementType(String measurementType) {
-        this.measurementType = measurementType;
-    }
-
-    @Override
-    public String toString() {
-        return "QuantityDTO{" +
-                "value=" + value +
-                ", unit='" + unit + '\'' +
-                ", measurementType='" + measurementType + '\'' +
-                '}';
+    @AssertTrue(message = "Unit must be valid for the specified measurement type")
+    public boolean isUnitValidForType() {
+        if (unit == null || measurementType == null) return true;
+        return switch (measurementType) {
+            case "LengthUnit"      -> unit.matches("FEET|INCHES|YARD");
+            case "WeightUnit"      -> unit.matches("GRAM|KILOGRAM|TONNE");
+            case "VolumeUnit"      -> unit.matches("MILLILITER|LITER|KILOLITER|GALLON");
+            case "TemperatureUnit" -> unit.matches("CELSIUS|FAHRENHEIT|KELVIN");
+            default -> false;
+        };
     }
 }
