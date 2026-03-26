@@ -2,12 +2,28 @@ package com.app.quantitymeasurement.units;
 
 import com.app.quantitymeasurement.IMeasurable;
 
-// Enum representing weight measurement units. Each enum value knows how to
-// convert to/from a chosen base unit (kilogram) via a conversion factor.
+/**
+ * WeightUnit defines supported weight measurement units and conversion logic.
+ *
+ * Role in the application:
+ * - Serves as a typed representation of weight units (KILOGRAM, GRAM, POUND).
+ * - Provides conversion to/from a canonical base unit (kilogram) using a
+ *   conversion factor. The rest of the application can rely on the base unit
+ *   for comparisons and arithmetic.
+ *
+ * Design notes:
+ * - Conversion is implemented using a multiplicative conversion factor
+ *   relative to the base unit (kilogram).
+ * - Implements IMeasurable so callers can treat different unit enums
+ *   polymorphically.
+ */
 public enum WeightUnit implements IMeasurable{
 
+    // Base unit: kilogram (factor 1.0)
     KILOGRAM(1.0),
+    // Gram: 0.001 kilograms
     GRAM(0.001),
+    // Pound: 0.453592 kilograms
     POUND(0.453592);
 
     private final double conversionFactor;
@@ -16,6 +32,7 @@ public enum WeightUnit implements IMeasurable{
         this.conversionFactor = conversionFactor;
     }
 
+    // Returns the factor used to convert this unit to the base unit
     public double getConversionFactor() {
         return conversionFactor;
     }
@@ -30,6 +47,7 @@ public enum WeightUnit implements IMeasurable{
         return baseValue / conversionFactor;
     }
     
+    // Human-readable unit name (matches enum constant name)
     public String getUnitName() {
     	return this.name();
     }

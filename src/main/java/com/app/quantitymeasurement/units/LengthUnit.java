@@ -2,6 +2,13 @@ package com.app.quantitymeasurement.units;
 
 import com.app.quantitymeasurement.IMeasurable;
 
+/**
+ * LengthUnit represents length/distance units and provides conversion
+ * to/from a canonical base unit (inches in this implementation).
+ *
+ * The enum implements IMeasurable so it can be used generically in
+ * measurement operations alongside other unit enums.
+ */
 public enum LengthUnit implements IMeasurable{
 
     FEET(12.0),
@@ -28,7 +35,7 @@ public enum LengthUnit implements IMeasurable{
     }
     
     public String getUnitName() {
-    	return this.name();
+        return this.name();
     }
 
     // Implement measurement type for this enum

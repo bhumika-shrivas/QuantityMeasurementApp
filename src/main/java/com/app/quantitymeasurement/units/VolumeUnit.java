@@ -2,11 +2,21 @@ package com.app.quantitymeasurement.units;
 
 import com.app.quantitymeasurement.IMeasurable;
 
-// Enum representing volume measurement units. Uses litre as the base unit.
+/**
+ * VolumeUnit represents supported volume units and conversion logic.
+ *
+ * Role:
+ * - Provides conversion to/from a canonical base unit (litre).
+ * - Used by the measurement service to normalize values before comparisons
+ *   or arithmetic operations.
+ */
 public enum VolumeUnit implements IMeasurable {
 
+    // Base unit: litre
     LITRE(1.0),
+    // Millilitre: 0.001 litres
     MILLILITRE(0.001),
+    // Gallon (US): 3.78541 litres
     GALLON(3.78541);
 
     private final double conversionFactor;

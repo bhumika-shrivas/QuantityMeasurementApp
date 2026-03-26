@@ -3,10 +3,12 @@ package com.app.quantitymeasurement.units;
 import com.app.quantitymeasurement.IMeasurable;
 
 /**
- * Enum representing Temperature Units.
- * Base unit: CELSIUS
- * Temperature conversions are affine (offset + scale) rather than pure scaling,
- * so each unit provides custom convertToBaseUnit/convertFromBaseUnit implementations.
+ * TemperatureUnit defines temperature units and handles affine conversions
+ * to/from a canonical base unit (Celsius).
+ *
+ * Temperature conversion differs from other units because transformations
+ * are affine (scale + offset) rather than purely multiplicative. Each enum
+ * constant overrides conversion methods accordingly.
  */
 public enum TemperatureUnit implements IMeasurable {
 
@@ -35,11 +37,13 @@ public enum TemperatureUnit implements IMeasurable {
     FAHRENHEIT {
         @Override
         public double convertToBaseUnit(double value) {
+            // Convert Fahrenheit to Celsius: (F - 32) * 5/9
             return (value - 32) * 5.0 / 9.0;
         }
 
         @Override
         public double convertFromBaseUnit(double baseValue) {
+            // Convert Celsius to Fahrenheit: (C * 9/5) + 32
             return (baseValue * 9.0 / 5.0) + 32;
         }
 
@@ -57,11 +61,13 @@ public enum TemperatureUnit implements IMeasurable {
     KELVIN {
         @Override
         public double convertToBaseUnit(double value) {
+            // Kelvin to Celsius
             return value - 273.15;
         }
 
         @Override
         public double convertFromBaseUnit(double baseValue) {
+            // Celsius to Kelvin
             return baseValue + 273.15;
         }
 
