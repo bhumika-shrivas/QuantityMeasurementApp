@@ -15,6 +15,9 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.app.quantitymeasurement.security.JwtUtils;
+import com.app.quantitymeasurement.security.UserDetailsServiceImpl;
+
 @WebMvcTest(QuantityMeasurementController.class)
 @WithMockUser  // simulates a logged-in user so Security doesn't block
 class QuantityMeasurementControllerTest {
@@ -23,6 +26,8 @@ class QuantityMeasurementControllerTest {
     @Autowired ObjectMapper objectMapper;
 
     @MockBean IQuantityMeasurementService service;
+    @MockBean JwtUtils jwtUtils;
+    @MockBean UserDetailsServiceImpl userDetailsService;
 
     @Test
     void testCompareQuantities_Returns200() throws Exception {

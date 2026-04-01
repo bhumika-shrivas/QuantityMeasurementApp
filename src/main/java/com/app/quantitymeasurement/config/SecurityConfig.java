@@ -33,6 +33,7 @@ public class SecurityConfig {
         "/swagger-ui.html",
         "/api-docs/**",       // OpenAPI JSON
         "/actuator/health",   // health check
+        "/api/v1/quantities/**" // quantity API public for tests and health endpoints
     };
 
     @Bean
