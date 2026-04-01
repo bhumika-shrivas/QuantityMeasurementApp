@@ -1,285 +1,255 @@
-# ✅ UC17: Spring Framework Integration - REST Services and JPA for Quantity Measurement
+# ✅ UC18: Spring Security - JWT Authentication & Google OAuth2 for Quantity Measurement
 
 ## 📖 Description
 
-UC17 transforms the Quantity Measurement Application into a **production-grade Spring Boot REST service**.
+UC18 secures the Quantity Measurement Application by introducing **enterprise-grade authentication and authorization** using Spring Security, JWT (JSON Web Tokens), and Google OAuth2.
 
-In UC16, the application implemented **JDBC-based database persistence**, but still required significant boilerplate code — manual connection management, raw SQL queries, manual JSON handling, and no HTTP exposure.
+In UC17, all REST endpoints were publicly accessible — anyone could call `/api/v1/quantities/compare` without any identity. UC18 changes this completely:
 
-UC17 eliminates all of this by leveraging the **Spring Boot ecosystem**:
+- Every API endpoint now requires a valid JWT token
+- Users can register and login using **username/password (JWT)**
+- Users can also sign in using **Google OAuth2 (Sign in with Google)**
+- Both methods return the same JWT token format for consistent API access
+- Role-based access control restricts certain endpoints to **ADMIN** users only
 
-- Spring Boot replaces manual application wiring
-- Spring Data JPA replaces all JDBC boilerplate
-- Spring MVC exposes REST API endpoints
-- Spring Security provides a security foundation
-- Swagger/OpenAPI generates interactive API documentation
-- Spring Boot Actuator enables health monitoring
-
-UC17 is **fully backward compatible** with UC1–UC16. All business logic is preserved with identical results.
+UC18 is **fully backward compatible** with UC1–UC17. All business logic and REST endpoints are preserved — they now simply require authentication.
 
 ---
 
 ## 🎯 Objective
 
-- Expose measurement operations as **RESTful HTTP endpoints**
-- Replace manual JDBC code with **Spring Data JPA**
-- Enable **dependency injection** via Spring IoC container
-- Implement **centralized exception handling** using `@ControllerAdvice`
-- Add **input validation** using Bean Validation annotations
-- Generate **interactive API documentation** using Swagger UI
-- Enable **application monitoring** using Spring Boot Actuator
-- Maintain full compatibility with **UC1–UC16 functionality**
+- Implement **JWT-based authentication** (register + login)
+- Implement **Google OAuth2** sign-in with auto user creation
+- Protect all `/api/v1/quantities/**` endpoints with JWT
+- Implement **role-based access control** (`ROLE_USER`, `ROLE_ADMIN`)
+- Centralize authentication logic in `AuthService`
+- Integrate with **Swagger UI** for easy token-based API testing
+- Persist users and roles using **Spring Data JPA**
 
 ---
 
 ## 🏗 Updated Architecture
 ```
-Client (curl / Postman / Swagger UI)
-            ↓  HTTP Request (JSON)
-    REST Controller Layer          @RestController
+Client (Swagger / Postman / Browser)
             ↓
-    Service Layer                  @Service
+    JwtAuthFilter (intercepts every request)
             ↓
-    Repository Layer               @Repository (Spring Data JPA)
+    SecurityConfig (which URLs need auth)
+       ↙           ↘
+JWT Login        Google OAuth2
+  ↓                    ↓
+AuthService       OAuth2SuccessHandler
+  ↓                    ↓
+UserRepository    UserRepository (auto-create user)
+  ↓                    ↓
+       JWT Token returned
             ↓
-    Database (H2 In-Memory)        JPA / Hibernate
+    Client sends: Authorization: Bearer <token>
+            ↓
+    REST Controller processes request
 ```
-
-Spring IoC container manages all dependencies automatically — no manual object creation or wiring.
 
 ---
 
-## 🔹 What Changed vs UC16
+## 🔐 Authentication Flow
 
-| Aspect | UC16 | UC17 |
-|--------|------|------|
-| HTTP Exposure | None | REST API on port 8080 |
-| Data Access | Manual JDBC + HikariCP | Spring Data JPA (zero SQL) |
-| Dependency Injection | Manual constructor injection | `@Autowired` by Spring |
-| JSON Handling | Manual / Jackson setup | Auto-serialized by Spring MVC |
-| Exception Handling | Per-method try-catch | Centralized `@ControllerAdvice` |
-| Input Validation | Manual null checks | `@Valid`, `@NotNull`, `@Pattern` |
-| API Documentation | None | Swagger UI at `/swagger-ui.html` |
-| Transaction Management | Manual | `@Transactional` declarative |
-| Monitoring | None | Actuator at `/actuator/health` |
-| Testing | Manual integration tests | MockMvc + `@SpringBootTest` |
+### JWT Flow (username/password)
+```
+1. POST /auth/register  → User created in DB → JWT returned
+2. POST /auth/login     → Password verified  → JWT returned
+3. Copy token from response
+4. Add to Swagger: Authorize → "Bearer <token>"
+5. All API calls now authenticated ✅
+```
+
+### Google OAuth2 Flow
+```
+1. Browser → http://localhost:8080/oauth2/authorization/google
+2. Google login page appears
+3. User signs in with Gmail
+4. OAuth2SuccessHandler creates user in DB (if new)
+5. JWT token returned as JSON response
+6. Copy token → use in Swagger as "Bearer <token>"
+7. All API calls now authenticated ✅
+```
 
 ---
 
-## 🔹 Layer-by-Layer Breakdown
+## 🔹 New Components
 
-### REST Controller Layer
-```
-QuantityMeasurementController
-```
-
-**Annotations used:**
-- `@RestController` — marks class as REST controller, returns JSON automatically
-- `@RequestMapping("/api/v1/quantities")` — base URL for all endpoints
-- `@PostMapping`, `@GetMapping` — maps HTTP verbs to methods
-- `@RequestBody` — deserializes incoming JSON to Java object
-- `@PathVariable` — extracts value from URL path
-- `@Valid` — triggers Bean Validation on incoming DTOs
-- `@Operation`, `@Tag` — Swagger documentation annotations
-
-**Supported endpoints:**
-
-| Method | URL | Description |
-|--------|-----|-------------|
-| POST | `/api/v1/quantities/compare` | Compare two quantities |
-| POST | `/api/v1/quantities/convert` | Convert a quantity to another unit |
-| POST | `/api/v1/quantities/add` | Add two quantities |
-| POST | `/api/v1/quantities/subtract` | Subtract two quantities |
-| POST | `/api/v1/quantities/divide` | Divide two quantities |
-| GET | `/api/v1/quantities/history/operation/{operation}` | Get history by operation type |
-| GET | `/api/v1/quantities/history/type/{measurementType}` | Get history by measurement type |
-| GET | `/api/v1/quantities/history/errored` | Get all error records |
-| GET | `/api/v1/quantities/count/{operation}` | Count successful operations |
-
----
-
-### Service Layer
-```
-IQuantityMeasurementService
-QuantityMeasurementServiceImpl
-```
-
-**Key changes from UC16:**
-- Added `@Service` annotation — Spring registers and manages this bean
-- Added `@Autowired` — Spring injects repository automatically
-- All operation methods now return `QuantityMeasurementDTO` instead of raw `QuantityDTO`
-- Added 4 new history/count methods
-- `convertDtoToModel()` replaces old `QuantityMapper` dependency
-- Errors are saved to the database for audit tracking
-
----
-
-### Repository Layer
-```
-QuantityMeasurementRepository  (extends JpaRepository)
-```
-
-This single interface **replaces all UC16 JDBC code** — no SQL, no ResultSet, no try-catch.
-
-Spring Data JPA auto-generates implementation from method names:
-
-| Method | Generated SQL |
-|--------|--------------|
-| `findByOperation(String op)` | `WHERE operation = ?` |
-| `findByThisMeasurementType(String type)` | `WHERE this_measurement_type = ?` |
-| `findByCreatedAtAfter(LocalDateTime date)` | `WHERE created_at > ?` |
-| `findByIsErrorTrue()` | `WHERE is_error = true` |
-| `countByOperationAndIsErrorFalse(String op)` | `COUNT(*) WHERE operation = ? AND is_error = false` |
-
-`JpaRepository` also provides for free: `save()`, `findAll()`, `findById()`, `deleteById()`, `count()`
-
----
-
-### Model / Entity Layer
-```
-QuantityMeasurementEntity  (JPA Entity)
-```
-
-**JPA annotations added:**
-- `@Entity` — maps class to database table
-- `@Table(name = "quantity_measurements")` — specifies table name with indexes
-- `@Id` + `@GeneratedValue` — auto-increment primary key
-- `@Column` — column constraints
-- `@PrePersist` / `@PreUpdate` — auto-sets `createdAt` and `updatedAt` timestamps
-
-**Lombok annotations added:**
-- `@Data` — generates all getters, setters, equals, hashCode, toString
-- `@NoArgsConstructor` — required by JPA
-- `@AllArgsConstructor` — full constructor
-
----
-
-### DTO Layer
-
-**New/Updated DTOs:**
+### Security Package (`com.app.quantitymeasurement.security`)
 
 | Class | Purpose |
 |-------|---------|
-| `QuantityDTO` | Input DTO with `@NotNull`, `@NotEmpty`, `@Pattern`, `@AssertTrue` validation |
-| `QuantityInputDTO` | Wraps two `QuantityDTO`s for REST request body |
-| `QuantityMeasurementDTO` | Rich response DTO with `fromEntity()`, `toEntity()`, `fromEntityList()` factory methods |
-| `OperationType` | Enum: `ADD`, `SUBTRACT`, `MULTIPLY`, `DIVIDE`, `COMPARE`, `CONVERT` |
+| `JwtUtils` | Generates, validates, and parses JWT tokens |
+| `JwtAuthFilter` | Intercepts every HTTP request and validates JWT |
+| `UserDetailsServiceImpl` | Loads user from DB by email for Spring Security |
+| `OAuth2SuccessHandler` | Handles successful Google login, creates user, returns JWT |
+
+### Model Layer
+
+| Class | Purpose |
+|-------|---------|
+| `User` | Entity with id, email, username, password, fullName, provider, roles |
+| `Role` | Entity with `ROLE_USER` and `ROLE_ADMIN` enum values |
+
+### Repository Layer
+
+| Interface | Purpose |
+|-----------|---------|
+| `UserRepository` | `findByEmail`, `existsByEmail`, `existsByUsername` |
+| `RoleRepository` | `findByName(RoleName)` |
+
+### Auth Layer (`com.app.quantitymeasurement.service.auth`)
+
+| Class | Purpose |
+|-------|---------|
+| `AuthService` | `register()` and `login()` business logic |
+
+### Controller Layer
+
+| Class | Endpoints |
+|-------|-----------|
+| `AuthController` | `POST /auth/register`, `POST /auth/login` |
+| `UserController` | `GET /users/me`, `GET /users/all` (ADMIN only) |
+
+### DTOs
+
+| Class | Purpose |
+|-------|---------|
+| `RegisterRequest` | Input for registration (fullName, username, email, password) |
+| `LoginRequest` | Input for login (email, password) |
+| `AuthResponse` | Output with JWT token, user info, and roles |
 
 ---
 
-### Exception Handling
-```
-GlobalExceptionHandler  (@RestControllerAdvice)
-```
+## 🔒 Security Rules
 
-Centralized handler for all exceptions across all controllers:
+| URL Pattern | Access |
+|-------------|--------|
+| `POST /auth/register` | Public — no token needed |
+| `POST /auth/login` | Public — no token needed |
+| `GET /oauth2/authorization/google` | Public — Google login |
+| `GET /swagger-ui/**` | Public — API documentation |
+| `GET /h2-console/**` | Public — database console |
+| `GET /actuator/health` | Public — health check |
+| `GET /users/all` | `ROLE_ADMIN` only |
+| `GET /users/me` | Any authenticated user |
+| `POST /api/v1/quantities/**` | Any authenticated user |
+| `GET /api/v1/quantities/**` | Any authenticated user |
 
-| Handler | Handles | HTTP Status |
-|---------|---------|-------------|
-| `handleValidationException` | `@Valid` failures | 400 Bad Request |
-| `handleQuantityException` | `QuantityMeasurementException` | 400 Bad Request |
-| `handleGlobalException` | All other exceptions | 500 Internal Server Error |
+---
 
-**Error response format:**
-```json
-{
-  "timestamp": "2026-03-18T11:15:10",
-  "status": 400,
-  "error": "Quantity Measurement Error",
-  "message": "Unit must be valid for the specified measurement type",
-  "path": "/api/v1/quantities/add"
+## 👤 User Entity
+```java
+@Entity
+@Table(name = "users")
+public class User {
+    private Long id;
+    private String username;       // unique
+    private String email;          // unique, used as login identifier
+    private String password;       // BCrypt encoded (null for Google users)
+    private String fullName;
+    private String provider;       // "LOCAL" or "GOOGLE"
+    private String providerId;     // Google's sub ID (OAuth2 only)
+    private boolean enabled;
+    private Set<Role> roles;       // ROLE_USER or ROLE_ADMIN
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
 ```
 
 ---
 
-### Security Configuration
-```
-SecurityConfig  (@Configuration)
-```
+## 🗄 Database Tables Created
+```sql
+-- Users table
+CREATE TABLE users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255),
+    full_name VARCHAR(255) NOT NULL,
+    provider VARCHAR(255) NOT NULL,
+    provider_id VARCHAR(255),
+    enabled BOOLEAN NOT NULL,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
 
-Configured to **allow all requests** for development. Provides the foundation for adding JWT or OAuth2 authentication in future use cases. CSRF disabled for stateless REST API. H2 console frame access enabled.
+-- Roles table
+CREATE TABLE roles (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL
+);
 
----
+-- Join table
+CREATE TABLE user_roles (
+    user_id BIGINT,
+    role_id BIGINT
+);
 
-## ⚙️ application.properties
-```properties
-spring.application.name=quantity-measurement-app
-
-# H2 In-Memory Database
-spring.datasource.url=jdbc:h2:mem:quantitymeasurementdb;DB_CLOSE_DELAY=-1
-spring.datasource.driver-class-name=org.h2.Driver
-spring.datasource.username=sa
-spring.datasource.password=
-
-# JPA / Hibernate
-spring.jpa.database-platform=org.hibernate.dialect.H2Dialect
-spring.jpa.hibernate.ddl-auto=create-drop
-spring.jpa.show-sql=true
-
-# H2 Console
-spring.h2.console.enabled=true
-spring.h2.console.path=/h2-console
-
-# Swagger
-springdoc.swagger-ui.path=/swagger-ui.html
-springdoc.api-docs.path=/api-docs
-
-# Actuator
-management.endpoints.web.exposure.include=health,info,metrics
-
-# Server
-server.port=8080
+-- Seeded on startup via data.sql
+INSERT INTO roles (name) VALUES ('ROLE_USER');
+INSERT INTO roles (name) VALUES ('ROLE_ADMIN');
 ```
 
 ---
 
-## 🔥 Key Maven Dependencies Added
+## ⚙️ New Dependencies Added
 ```xml
-spring-boot-starter-web          <!-- Tomcat + Spring MVC + REST + JSON -->
-spring-boot-starter-data-jpa     <!-- Hibernate ORM + Spring Data -->
-spring-boot-starter-validation   <!-- @NotNull, @Valid etc. -->
-spring-boot-starter-security     <!-- Security foundation -->
-spring-boot-starter-actuator     <!-- /actuator/health, /metrics -->
-h2                               <!-- In-memory database -->
-lombok                           <!-- @Data, @Builder etc. -->
-springdoc-openapi-starter-webmvc-ui  <!-- Swagger UI -->
-spring-boot-starter-test         <!-- MockMvc + SpringBootTest -->
+<!-- JWT -->
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-api</artifactId>
+    <version>0.11.5</version>
+</dependency>
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-impl</artifactId>
+    <version>0.11.5</version>
+    <scope>runtime</scope>
+</dependency>
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt-jackson</artifactId>
+    <version>0.11.5</version>
+    <scope>runtime</scope>
+</dependency>
+
+<!-- Google OAuth2 -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-oauth2-client</artifactId>
+</dependency>
 ```
 
 ---
 
-## 🧪 Testing
+## ⚙️ application.properties (New Properties)
+```properties
+# JWT Configuration
+app.jwt.secret=QuantityMeasurementAppSecretKey2026VeryLongSecretKeyForHS256Algorithm
+app.jwt.expiration-ms=86400000
 
-### Unit Tests — MockMvc
-```
-@WebMvcTest(QuantityMeasurementController.class)
-```
+# Google OAuth2
+spring.security.oauth2.client.registration.google.client-id=YOUR_CLIENT_ID
+spring.security.oauth2.client.registration.google.client-secret=YOUR_CLIENT_SECRET
+spring.security.oauth2.client.registration.google.scope=email,profile
 
-- Loads only the controller layer — no database needed
-- `@MockBean` mocks the service layer
-- Tests HTTP status codes, response JSON, validation failures
-
-### Integration Tests — Spring Boot Test
+# Role seeding
+spring.sql.init.mode=always
+spring.jpa.defer-datasource-initialization=true
 ```
-@SpringBootTest(webEnvironment = RANDOM_PORT)
-```
-
-- Starts the full application context
-- Uses `TestRestTemplate` to make real HTTP calls
-- Tests end-to-end: Controller → Service → Repository → H2 DB
 
 ---
 
 ## 🚀 How to Run
 ```bash
-# Build and compile
+# Build
 mvn clean compile
 
-# Run all tests
-mvn test
-
-# Start Spring Boot application
+# Run
 mvn spring-boot:run
 ```
 
@@ -289,125 +259,135 @@ mvn spring-boot:run
 
 | URL | Description |
 |-----|-------------|
-| `http://localhost:8080/api/v1/quantities/compare` | Compare endpoint |
-| `http://localhost:8080/swagger-ui.html` | Interactive API documentation |
-| `http://localhost:8080/api-docs` | Raw OpenAPI JSON spec |
-| `http://localhost:8080/h2-console` | H2 Database console |
-| `http://localhost:8080/actuator/health` | Application health check |
-| `http://localhost:8080/actuator/metrics` | Application metrics |
-
-**H2 Console credentials:**
-- JDBC URL: `jdbc:h2:mem:quantitymeasurementdb`
-- Username: `sa`
-- Password: *(leave blank)*
+| `http://localhost:8080/swagger-ui.html` | Interactive API docs + testing |
+| `http://localhost:8080/auth/register` | Register endpoint |
+| `http://localhost:8080/auth/login` | Login endpoint |
+| `http://localhost:8080/oauth2/authorization/google` | Google login |
+| `http://localhost:8080/users/me` | Current user profile |
+| `http://localhost:8080/h2-console` | H2 database console |
+| `http://localhost:8080/actuator/health` | Health check |
 
 ---
 
 ## 🧪 Sample curl Commands
 
-### Compare 1 foot vs 12 inches
+### Register
 ```bash
-curl -X POST http://localhost:8080/api/v1/quantities/compare \
+curl -X POST http://localhost:8080/auth/register \
   -H "Content-Type: application/json" \
   -d '{
-    "thisQuantityDTO": {"value": 1.0, "unit": "FEET", "measurementType": "LengthUnit"},
-    "thatQuantityDTO": {"value": 12.0, "unit": "INCHES", "measurementType": "LengthUnit"}
+    "fullName": "Bhumika Shrivas",
+    "username": "bhumika",
+    "email": "bhumika@test.com",
+    "password": "password123"
   }'
 ```
 
 **Response:**
 ```json
 {
+  "token": "eyJhbGciOiJIUzI1NiJ9...",
+  "type": "Bearer",
   "id": 1,
-  "thisValue": 1.0,
-  "thisUnit": "FEET",
-  "thisMeasurementType": "LengthUnit",
-  "thatValue": 12.0,
-  "thatUnit": "INCHES",
-  "thatMeasurementType": "LengthUnit",
-  "operation": "COMPARE",
-  "resultValue": "true",
-  "error": false,
-  "createdAt": "2026-03-18T11:15:10"
+  "username": "bhumika",
+  "email": "bhumika@test.com",
+  "fullName": "Bhumika Shrivas",
+  "roles": ["ROLE_USER"]
 }
 ```
 
-### Add 1 foot + 12 inches
+### Login
 ```bash
-curl -X POST http://localhost:8080/api/v1/quantities/add \
+curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
+  -d '{
+    "email": "bhumika@test.com",
+    "password": "password123"
+  }'
+```
+
+### Get Profile (with token)
+```bash
+curl http://localhost:8080/users/me \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
+
+### Call Quantity API (with token)
+```bash
+curl -X POST http://localhost:8080/api/v1/quantities/compare \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -d '{
     "thisQuantityDTO": {"value": 1.0, "unit": "FEET", "measurementType": "LengthUnit"},
     "thatQuantityDTO": {"value": 12.0, "unit": "INCHES", "measurementType": "LengthUnit"}
   }'
 ```
 
-### Get history of all ADD operations
+### Call without token (should get 401)
 ```bash
-curl http://localhost:8080/api/v1/quantities/history/operation/ADD
-```
-
-### Error scenario — cross-category operation
-```bash
-curl -X POST http://localhost:8080/api/v1/quantities/add \
-  -H "Content-Type: application/json" \
-  -d '{
-    "thisQuantityDTO": {"value": 1.0, "unit": "FEET",     "measurementType": "LengthUnit"},
-    "thatQuantityDTO": {"value": 1.0, "unit": "KILOGRAM", "measurementType": "WeightUnit"}
-  }'
-```
-
-**Error Response:**
-```json
-{
-  "timestamp": "2026-03-18T11:15:10",
-  "status": 400,
-  "error": "Quantity Measurement Error",
-  "message": "add Error: Cannot perform arithmetic between different measurement categories",
-  "path": "/api/v1/quantities/add"
-}
+curl http://localhost:8080/api/v1/quantities/history/operation/COMPARE
+# Returns: 401 Unauthorized
 ```
 
 ---
 
-## 🧠 Spring Boot Concepts Learned
+## 🔑 How to Use JWT in Swagger UI
 
-| Annotation | Layer | What it does |
-|-----------|-------|-------------|
-| `@SpringBootApplication` | Main class | Auto-config + component scan + bean registration |
-| `@RestController` | Controller | Marks REST controller, returns JSON automatically |
-| `@RequestMapping` | Controller | Sets base URL for all endpoints |
-| `@PostMapping` / `@GetMapping` | Method | Maps HTTP POST/GET to method |
-| `@RequestBody` | Param | Deserializes JSON body to Java object |
-| `@PathVariable` | Param | Extracts `{value}` from URL |
-| `@Valid` | Param | Triggers Bean Validation |
-| `@Service` | Service class | Registers as Spring service bean |
-| `@Repository` | Repository | Registers JPA repo, enables exception translation |
-| `@Autowired` | Field | Spring injects matching bean automatically |
-| `@Entity` | Model class | Maps class to database table |
-| `@Id` + `@GeneratedValue` | Field | Primary key with auto-increment |
-| `@PrePersist` / `@PreUpdate` | Method | Lifecycle hooks for timestamps |
-| `@Data` (Lombok) | Class | Generates all boilerplate |
-| `@Builder` (Lombok) | Class | Enables builder pattern |
-| `@RestControllerAdvice` | Exception class | Global exception handling |
-| `@ExceptionHandler` | Method | Handles specific exception type |
-| `@WebMvcTest` | Test class | Controller unit test — no DB |
-| `@SpringBootTest` | Test class | Full integration test |
-| `@MockBean` | Test field | Mocks a Spring bean in tests |
+1. Call `POST /auth/register` or `POST /auth/login`
+2. Copy the `token` value from the response
+3. Click the **🔒 Authorize** button at the top right of Swagger UI
+4. Type: `Bearer <paste_your_token_here>`
+5. Click **Authorize** → **Close**
+6. All subsequent API calls will automatically include the token ✅
+
+---
+
+## 🌐 Google OAuth2 Setup (Google Cloud Console)
+
+1. Go to [https://console.cloud.google.com](https://console.cloud.google.com)
+2. Create new project → **QuantityMeasurementApp**
+3. APIs & Services → Library → Enable **Google+ API**
+4. APIs & Services → Credentials → Create **OAuth Client ID**
+5. Application type: **Web application**
+6. Authorized redirect URI:
+```
+http://localhost:8080/login/oauth2/code/google
+```
+7. Copy **Client ID** and **Client Secret** → paste into `application.properties`
+8. Test: open `http://localhost:8080/oauth2/authorization/google` in browser
+
+---
+
+## 🧠 Spring Security Concepts Learned
+
+| Concept | Implementation |
+|---------|---------------|
+| JWT generation | `JwtUtils.generateTokenFromEmail()` using `jjwt` library |
+| JWT validation | `JwtUtils.validateToken()` — checks signature + expiry |
+| JWT filter | `JwtAuthFilter extends OncePerRequestFilter` |
+| Stateless sessions | `SessionCreationPolicy.STATELESS` — no server-side sessions |
+| Password encoding | `BCryptPasswordEncoder` — industry standard hashing |
+| UserDetails | `UserDetailsServiceImpl.loadUserByUsername()` |
+| Authentication | `AuthenticationManager.authenticate()` |
+| OAuth2 | `oauth2Login().successHandler(OAuth2SuccessHandler)` |
+| Role-based access | `@PreAuthorize("hasRole('ADMIN')")` |
+| Method security | `@EnableMethodSecurity` on `SecurityConfig` |
+| Public URLs | `.requestMatchers(...).permitAll()` |
+| Protected URLs | `.anyRequest().authenticated()` |
 
 ---
 
 ## 📤 Postconditions
 
-- Spring Boot application runs on embedded Tomcat at port 8080 ✅
-- REST endpoints accessible at `http://localhost:8080/api/v1/quantities/*` ✅
-- JPA entities auto-mapped to H2 database tables ✅
-- Swagger UI accessible at `http://localhost:8080/swagger-ui.html` ✅
-- H2 console accessible at `http://localhost:8080/h2-console` ✅
-- All UC1–UC16 business logic preserved with identical results ✅
-- Dependency injection managed by Spring IoC container ✅
-- Exception handling centralized through `@ControllerAdvice` ✅
-- Actuator endpoints available for monitoring ✅
+- All `/api/v1/quantities/**` endpoints require a valid JWT ✅
+- `POST /auth/register` creates user with BCrypt password and ROLE_USER ✅
+- `POST /auth/login` authenticates and returns JWT ✅
+- Google OAuth2 sign-in auto-creates user and returns JWT ✅
+- `GET /users/me` returns current user profile ✅
+- `GET /users/all` accessible only to ROLE_ADMIN ✅
+- Swagger UI works with Authorize → Bearer token ✅
+- H2 console remains accessible without auth ✅
+- All UC1–UC17 business logic preserved ✅
 
 ---
 
@@ -415,15 +395,8 @@ curl -X POST http://localhost:8080/api/v1/quantities/add \
 
 | Use Case | Capability Added |
 |----------|-----------------|
-| UC1 | Feet equality |
-| UC2 | Inch equality |
-| UC3 | Generic Length |
-| UC4 | Yard support |
-| UC5 | Unit conversion |
-| UC6 | Unit addition |
-| UC7 | Explicit target addition |
-| UC8 | Standalone units |
-| UC9 | Weight management |
+| UC1–UC8 | Length measurement operations |
+| UC9 | Weight measurement |
 | UC10 | Generic quantity architecture |
 | UC11 | Volume measurement |
 | UC12 | Subtraction & Division |
@@ -431,19 +404,21 @@ curl -X POST http://localhost:8080/api/v1/quantities/add \
 | UC14 | Temperature measurement |
 | UC15 | N-Tier architecture |
 | UC16 | JDBC database persistence |
-| **UC17** | **Spring Boot REST API + JPA** |
+| UC17 | Spring Boot REST API + JPA |
+| **UC18** | **JWT + Google OAuth2 + Role-based Security** |
 
 ---
 
 ## 🔥 Key Achievement
 
-UC17 transforms the application from a **database-backed console app** into a **fully functional REST microservice**.
+UC18 transforms the application from an **open REST API** into a **secured, production-ready service**.
 
 The system now supports:
-- HTTP-based access from any client (browser, Postman, curl, mobile app)
-- Persistent operation history queryable via REST
-- Interactive API documentation via Swagger
-- Enterprise-grade dependency injection and transaction management
-- Foundation for future enhancements: JWT security, cloud deployment, microservices
+- Stateless JWT authentication — scales horizontally without session storage
+- Google OAuth2 — enterprise-grade social login
+- Role-based authorization — fine-grained access control
+- BCrypt password hashing — secure credential storage
+- Foundation ready for: refresh tokens, email verification, rate limiting, and cloud deployment
 
 ---
+
