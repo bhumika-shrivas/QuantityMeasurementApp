@@ -2,28 +2,15 @@ package com.app.quantitymeasurement.units;
 
 import com.app.quantitymeasurement.IMeasurable;
 
-/**
- * WeightUnit defines supported weight measurement units and conversion logic.
- *
- * Role in the application:
- * - Serves as a typed representation of weight units (KILOGRAM, GRAM, POUND).
- * - Provides conversion to/from a canonical base unit (kilogram) using a
- *   conversion factor. The rest of the application can rely on the base unit
- *   for comparisons and arithmetic.
- *
- * Design notes:
- * - Conversion is implemented using a multiplicative conversion factor
- *   relative to the base unit (kilogram).
- * - Implements IMeasurable so callers can treat different unit enums
- *   polymorphically.
- */
-public enum WeightUnit implements IMeasurable{
+public enum WeightUnit implements IMeasurable {
 
-    // Base unit: kilogram (factor 1.0)
+    // Base unit: kilogram
     KILOGRAM(1.0),
     // Gram: 0.001 kilograms
     GRAM(0.001),
-    // Pound: 0.453592 kilograms
+    // Tonne: 1000 kilograms
+    TONNE(1000.0),
+    // Keep POUND as alias-supported unit if needed
     POUND(0.453592);
 
     private final double conversionFactor;
@@ -32,24 +19,24 @@ public enum WeightUnit implements IMeasurable{
         this.conversionFactor = conversionFactor;
     }
 
-    // Returns the factor used to convert this unit to the base unit
+    @Override
     public double getConversionFactor() {
         return conversionFactor;
     }
 
-    // convert a value in this unit to the base unit (kilogram)
+    @Override
     public double convertToBaseUnit(double value) {
         return value * conversionFactor;
     }
 
-    // convert a value from the base unit into this unit
+    @Override
     public double convertFromBaseUnit(double baseValue) {
         return baseValue / conversionFactor;
     }
-    
-    // Human-readable unit name (matches enum constant name)
+
+    @Override
     public String getUnitName() {
-    	return this.name();
+        return this.name();
     }
 
     @Override
@@ -60,10 +47,15 @@ public enum WeightUnit implements IMeasurable{
     @Override
     public IMeasurable fromUnitName(String unitName) {
         if (unitName == null) return null;
-        try {
-            return WeightUnit.valueOf(unitName.trim().toUpperCase());
-        } catch (IllegalArgumentException ex) {
-            return null; // unknown unit name
-        }
+
+        String normalized = unitName.trim().toUpperCase();
+
+        return switch (normalized) {
+            case "KILOGRAM", "KG" -> KILOGRAM;
+            case "GRAM", "G" -> GRAM;
+            case "TONNE", "TON" -> TONNE;
+            case "POUND", "LB", "LBS" -> POUND;
+            default -> null;
+        };
     }
 }
