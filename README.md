@@ -16,7 +16,7 @@ UC18 is **fully backward compatible** with UC1–UC17. All business logic and RE
 
 ---
 
-## 🎯 Objective
+## 🎯 Objective 
 
 - Implement **JWT-based authentication** (register + login)
 - Implement **Google OAuth2** sign-in with auto user creation
