@@ -26,6 +26,7 @@ public class SecurityConfig {
     // ─── PUBLIC URLs (no token needed) ───
     private static final String[] PUBLIC_URLS = {
         "/",                  // root endpoint
+        "/api/health",        // backend health check
         "/auth/**",           // register, login
         "/oauth2/**",         // Google OAuth2 flow
         "/login/**",          // Google callback and login pages
