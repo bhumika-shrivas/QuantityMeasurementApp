@@ -25,12 +25,14 @@ public class SecurityConfig {
 
     // ─── PUBLIC URLs (no token needed) ───
     private static final String[] PUBLIC_URLS = {
+        "/",                  // root endpoint
         "/auth/**",           // register, login
         "/oauth2/**",         // Google OAuth2 flow
-        "/login/oauth2/**",   // Google callback
+        "/login/**",          // Google callback and login pages
         "/h2-console/**",     // H2 database console
         "/swagger-ui/**",     // Swagger UI
         "/swagger-ui.html",
+        "/v3/api-docs/**",    // Modern OpenAPI JSON
         "/api-docs/**",       // OpenAPI JSON
         "/actuator/health",   // health check
         "/api/v1/quantities/**" // quantity API public for tests and health endpoints
@@ -50,6 +52,9 @@ public class SecurityConfig {
                 .requestMatchers("/users/all").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
+            // Enable Google OAuth2 Logging
+            .oauth2Login(oauth2 -> oauth2
+                    .successHandler(oAuth2SuccessHandler))
             // JWT filter runs before every request
             .addFilterBefore(jwtAuthFilter,
                     UsernamePasswordAuthenticationFilter.class);
