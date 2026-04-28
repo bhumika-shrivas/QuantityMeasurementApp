@@ -1,0 +1,25 @@
+.classpath
+.project
+.settings/
+target/
+.gitignorequantity_measurements.ser 
+.env
+microservices\auth-service\src\main\resources
+
+# Secrets
+*.pem
+*.key
+*.env
+
+# Spring Boot secrets
+application.properties
+application.yml
+
+# Build files
+target/
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.pem

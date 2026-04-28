@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+
+  api-gateway:
+    build: ./microservices/api-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth-service
+      - user-service
+      - measurement-service
+      - history-service
+
+  auth-service:
+    build: ./microservices/auth-service
+    ports:
+      - "8081:8081"
+
+  user-service:
+    build: ./microservices/user-service
+    ports:
+      - "8082:8082"
+
+  measurement-service:
+    build: ./microservices/measurement-service
+    ports:
+      - "8083:8083"
+
+  history-service:
+    build: ./microservices/history-service
+    ports:
+      - "8084:8084"
