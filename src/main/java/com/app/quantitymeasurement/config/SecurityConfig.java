@@ -50,9 +50,6 @@ public class SecurityConfig {
                 .requestMatchers("/users/all").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
-            // Google OAuth2
-            .oauth2Login(oauth2 -> oauth2
-                    .successHandler(oAuth2SuccessHandler))
             // JWT filter runs before every request
             .addFilterBefore(jwtAuthFilter,
                     UsernamePasswordAuthenticationFilter.class);
